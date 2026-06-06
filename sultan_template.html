@@ -46,7 +46,7 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
 .master{font-family:var(--num);font-weight:700;color:var(--pink);text-shadow:0 0 6px rgba(255,79,163,.55);}
 #scrim{position:fixed;inset:0;background:rgba(8,4,20,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;}
 #scrim.on{display:flex;}
-.card{background:linear-gradient(160deg,#1b0b34,#2a1556);border:1px solid var(--pink);border-radius:16px;max-width:520px;width:100%;padding:0;overflow:hidden;box-shadow:0 0 40px rgba(255,79,163,.3);}
+.card{background:linear-gradient(160deg,#1b0b34,#2a1556);border:1px solid var(--pink);border-radius:16px;max-width:520px;width:100%;padding:0;overflow-y:auto;overflow-x:hidden;max-height:84vh;box-shadow:0 0 40px rgba(255,79,163,.3);}
 .card .hd{background:#140826;color:#fff;padding:18px 20px;border-bottom:1px solid var(--pink);}
 .card .hd .big{font-family:var(--disp);font-size:20px;letter-spacing:2px;}
 .card .hd .sub{color:var(--cyan);font-size:12px;margin-top:5px;letter-spacing:1px;}
@@ -249,7 +249,7 @@ function render(){
   }).join('');
 }
 
-function openCard(name){
+function openCard(name, ev){
   const p = DATA.find(d=>d.name===name); if(!p) return;
   const overall = mode==='dynasty'? p.dyn_score : (fmt==='ppr'? p.overall_ppr : p.overall_half);
   const grade   = mode==='dynasty'? p.grade_dyn : (fmt==='ppr'? p.grade_ppr   : p.grade_half);
@@ -259,7 +259,7 @@ function openCard(name){
   document.getElementById('card').innerHTML =
     '<div class="hd"><button class="x" onclick="closeCard()">×</button>'
     + '<div class="ovbox"><div class="n">'+(overall!=null?overall.toFixed(1):'–')+'</div><div class="g">'+grade+' · '+(mode==='dynasty'?'DYNASTY':fmt.toUpperCase())+'</div></div>'
-    + '<div class="big">'+faceImg(p,true)+'<span style="vertical-align:middle;margin-left:10px">'+p.name+'</span></div><div class="sub"><img class="tlogo" referrerpolicy="no-referrer" src="'+logoUrl(p.team)+'" alt=""/> '+p.pos+' · '+(p.team||'')+' · '+p.games+' proj games (2026)</div></div>'
+    + '<div class="big">'+faceImg(p,true)+'<span style="vertical-align:middle;margin-left:10px">'+p.name+'</span></div><div class="sub"><img class="tlogo" referrerpolicy="no-referrer" src="'+logoUrl(p.team)+'" alt=""/> '+p.pos+' · '+(p.team||'')+(p.age!=null?' · '+p.age.toFixed(1)+' yrs':'')+' · '+p.games+' proj games (2026)</div></div>'
     + '<div class="bd">'
     + gb('Opportunity', p.opportunity) + gb('Efficiency', p.efficiency) + gb('Context', p.context) + gb('Role grade', p.role_grade)
     + '<div class="stats">'
@@ -270,6 +270,7 @@ function openCard(name){
     + stat('Total TDs', p.total_tds) + (p.is_rookie?stat('Prospect grade', p.prospect):'')
     + '</div></div>';
   document.getElementById('scrim').classList.add('on');
+  (function(){var c=document.getElementById('card');var vh=window.innerHeight||700;var ch=Math.min(c.offsetHeight, vh*0.84);var ty=ev?Math.max(16,Math.min(ev.clientY-140, vh-ch-16)):Math.max(16,(vh-ch)/2);c.style.position='fixed';c.style.left='50%';c.style.top=ty+'px';c.style.transform='translateX(-50%)';c.style.margin='0';})();
 }
 function closeCard(){ document.getElementById('scrim').classList.remove('on'); }
 
@@ -279,7 +280,7 @@ document.getElementById('pos').onclick=e=>{ if(e.target.dataset.p){ pos=e.target
 document.getElementById('q').oninput=e=>{ q=e.target.value; render(); };
 document.getElementById('resetmr').onclick=()=>{ myRanks={}; localStorage.removeItem(MR_KEY); render(); };
 document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=(k==='name'||k==='team')?1:-1;} render(); });
-document.getElementById('rows').addEventListener('click',e=>{ const tr=e.target.closest('tr.prow'); if(tr && !e.target.classList.contains('myrank')) openCard(decodeURIComponent(tr.dataset.name)); });
+document.getElementById('rows').addEventListener('click',e=>{ const tr=e.target.closest('tr.prow'); if(tr && !e.target.classList.contains('myrank')) openCard(decodeURIComponent(tr.dataset.name), e); });
 document.getElementById('rows').addEventListener('change',e=>{ if(e.target.classList.contains('myrank')){ const nm=decodeURIComponent(e.target.dataset.name); myRanks[fmt+'|'+nm]=e.target.value; localStorage.setItem(MR_KEY, JSON.stringify(myRanks)); render(); }});
 document.getElementById('scrim').addEventListener('click',e=>{ if(e.target.id==='scrim') closeCard(); });
 render();
@@ -292,14 +293,16 @@ document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) 
 };
 (function(){
   var SLEEPER='https://api.sleeper.app/v1';
-  var mode='redraft', fmt='ppr', playersMap=null, leagues=[], myUserId=null, rosters=[], usersById={}, teams=[];
+  var mode='redraft', fmt='ppr', playersMap=null, leagues=[], myUserId=null, rosters=[], usersById={}, teams=[], rosterSlots=[];
   var ROSTERED=new Set();
+  var SLOT_ELIG={QB:['QB'],RB:['RB'],WR:['WR'],TE:['TE'],FLEX:['RB','WR','TE'],WRRB_FLEX:['RB','WR'],REC_FLEX:['WR','TE'],WRTE_FLEX:['WR','TE'],SUPER_FLEX:['QB','RB','WR','TE'],SUPERFLEX:['QB','RB','WR','TE']};
   function nrm(s){return (s||'').toLowerCase().replace(/[^a-z ]/g,'').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/\s+/g,'');}
   var TB={}; DATA.forEach(function(r){TB[nrm(r.name)+'|'+r.pos]=r;});
   function val(r){ if(!r) return 0; return mode==='dynasty'? r.dyn_score : (fmt==='ppr'? r.overall_ppr : r.overall_half); }
   var $=function(id){return document.getElementById(id);};
   function setStatus(s){ $('tt_status').textContent=s; }
   function jget(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(u.split('/v1')[1]+' → '+r.status); return r.json(); }); }
+  function fmtLbl(){ return mode==='dynasty'?'Dynasty':fmt.toUpperCase(); }
   function loadUser(){
     var u=$('tt_user').value.trim(); if(!u){ setStatus('Type your Sleeper username first.'); return; }
     setStatus('Loading user…');
@@ -318,11 +321,11 @@ document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) 
   function recFor(pid){ var p=playersMap[pid]; if(!p) return null; var nm=p.full_name||((p.first_name||'')+' '+(p.last_name||'')); return TB[nrm(nm)+'|'+(p.position||'')]||null; }
   function loadLeague(){
     var leagueId=$('tt_league').value; setStatus('Loading league…');
-    ensurePlayers().then(function(){ return jget(SLEEPER+'/league/'+leagueId+'/rosters'); }).then(function(rs){ rosters=rs;
-      return jget(SLEEPER+'/league/'+leagueId+'/users');
-    }).then(function(us){ usersById={}; us.forEach(function(u){usersById[u.user_id]=u;});
-      buildTeams(); renderAll(); setStatus('Loaded '+teams.length+' teams.');
-    }).catch(function(e){ setStatus('Error: '+(e.message||e)); });
+    ensurePlayers().then(function(){ return jget(SLEEPER+'/league/'+leagueId); })
+      .then(function(lg){ rosterSlots=(lg&&lg.roster_positions)||['QB','RB','RB','WR','WR','TE','FLEX']; return jget(SLEEPER+'/league/'+leagueId+'/rosters'); })
+      .then(function(rs){ rosters=rs; return jget(SLEEPER+'/league/'+leagueId+'/users'); })
+      .then(function(us){ usersById={}; us.forEach(function(u){usersById[u.user_id]=u;}); buildTeams(); renderAll(); setStatus('Loaded '+teams.length+' teams · lineup: '+startSlots().join(', ')); })
+      .catch(function(e){ setStatus('Error: '+(e.message||e)); });
   }
   function buildTeams(){ ROSTERED.clear();
     teams=rosters.map(function(ro){ var owner=usersById[ro.owner_id]||{};
@@ -334,52 +337,82 @@ document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) 
     });
   }
   function teamValue(t){ return t.recs.reduce(function(a,r){return a+val(r);},0); }
-  function posBreak(t){ var o={QB:0,RB:0,WR:0,TE:0}; t.recs.forEach(function(r){o[r.pos]=(o[r.pos]||0)+val(r);}); return o; }
+  function posBreak(t){ var o={QB:0,RB:0,WR:0,TE:0}; t.recs.forEach(function(r){if(o[r.pos]!=null)o[r.pos]+=val(r);}); return o; }
+  function startSlots(){ return rosterSlots.filter(function(s){return SLOT_ELIG[s];}); }
+  function optimalStarters(recs){
+    var slots=startSlots().slice().sort(function(a,b){return SLOT_ELIG[a].length-SLOT_ELIG[b].length;});
+    var pool=recs.slice().sort(function(a,b){return val(b)-val(a);});
+    var used={}, starters=[];
+    slots.forEach(function(s){ var el=SLOT_ELIG[s]; for(var i=0;i<pool.length;i++){ if(!used[i]&&el.indexOf(pool[i].pos)>=0){ used[i]=1; starters.push({slot:s,r:pool[i]}); break; } } });
+    return {starters:starters, value:starters.reduce(function(a,x){return a+val(x.r);},0)};
+  }
   function show(id){ $(id).style.display=''; }
-  function fmtLbl(){ return mode==='dynasty'?'Dynasty':fmt.toUpperCase(); }
   function renderAll(){ renderRankings(); renderMyTeam(); renderFix(); renderTrade(); }
   function renderRankings(){
-    var ts=teams.slice().sort(function(a,b){return teamValue(b)-teamValue(a);});
-    var html='<h2>League power rankings</h2><table><thead><tr><th>#</th><th>Team</th><th class="num">Total</th><th class="num">QB</th><th class="num">RB</th><th class="num">WR</th><th class="num">TE</th></tr></thead><tbody>';
-    ts.forEach(function(t,i){ var pb=posBreak(t);
-      html+='<tr class="'+(t.isMine?'mine':'')+'"><td>'+(i+1)+'</td><td>'+t.name+(t.isMine?' ★':'')+'</td><td class="num val">'+teamValue(t).toFixed(0)+'</td><td class="num">'+pb.QB.toFixed(0)+'</td><td class="num">'+pb.RB.toFixed(0)+'</td><td class="num">'+pb.WR.toFixed(0)+'</td><td class="num">'+pb.TE.toFixed(0)+'</td></tr>';
+    var rows=teams.map(function(t){ return {t:t, sv:optimalStarters(t.recs).value, tv:teamValue(t)}; }).sort(function(a,b){return b.sv-a.sv;});
+    var html='<h2>League power rankings</h2><table><thead><tr><th>#</th><th>Team</th><th class="num">Starters</th><th class="num">Total</th><th class="num">QB</th><th class="num">RB</th><th class="num">WR</th><th class="num">TE</th></tr></thead><tbody>';
+    rows.forEach(function(x,i){ var pb=posBreak(x.t);
+      html+='<tr class="'+(x.t.isMine?'mine':'')+'"><td>'+(i+1)+'</td><td>'+x.t.name+(x.t.isMine?' ★':'')+'</td><td class="num val">'+x.sv.toFixed(0)+'</td><td class="num">'+x.tv.toFixed(0)+'</td><td class="num">'+pb.QB.toFixed(0)+'</td><td class="num">'+pb.RB.toFixed(0)+'</td><td class="num">'+pb.WR.toFixed(0)+'</td><td class="num">'+pb.TE.toFixed(0)+'</td></tr>';
     });
-    html+='</tbody></table><small>Total = sum of rostered RB/WR/TE '+fmtLbl()+' Overall. QBs not modeled yet.</small>';
+    html+='</tbody></table><small>Ranked by optimal STARTER value ('+fmtLbl()+'), using your league lineup slots. Total = whole roster. QBs only count if your spine includes them (hosted app).</small>';
     $('tt_rankings').innerHTML=html; show('tt_rankings');
   }
   function renderMyTeam(){
     var t=teams.filter(function(x){return x.isMine;})[0];
     if(!t){ $('tt_myteam').innerHTML='<h2>My team</h2><small>Could not match your username to a team here.</small>'; show('tt_myteam'); return; }
-    var recs=t.recs.slice().sort(function(a,b){return val(b)-val(a);});
-    var html='<h2>My team — '+t.name+'</h2><table><thead><tr><th>Player</th><th>Pos</th><th>Tm</th><th class="num">Overall</th></tr></thead><tbody>';
-    recs.forEach(function(r){ html+='<tr><td>'+r.name+(r.is_rookie?' <span class="rook">R</span>':'')+'</td><td><span class="pill '+r.pos+'">'+r.pos+'</span></td><td>'+r.team+'</td><td class="num val">'+val(r).toFixed(1)+'</td></tr>'; });
+    var opt=optimalStarters(t.recs); var startSet={}; opt.starters.forEach(function(s){startSet[s.r.name+'|'+s.r.pos]=1;});
+    var html='<h2>My team — '+t.name+' · starters '+opt.value.toFixed(0)+'</h2><table><thead><tr><th>Slot</th><th>Player</th><th>Pos</th><th>Tm</th><th class="num">Overall</th></tr></thead><tbody>';
+    opt.starters.forEach(function(s){ var r=s.r; html+='<tr><td><b>'+s.slot+'</b></td><td>'+r.name+(r.is_rookie?' <span class="rook">R</span>':'')+'</td><td><span class="pill '+r.pos+'">'+r.pos+'</span></td><td>'+r.team+'</td><td class="num val">'+val(r).toFixed(1)+'</td></tr>'; });
+    var bench=t.recs.filter(function(r){return !startSet[r.name+'|'+r.pos];}).sort(function(a,b){return val(b)-val(a);});
+    bench.forEach(function(r){ html+='<tr style="opacity:.55"><td><small>BN</small></td><td>'+r.name+(r.is_rookie?' <span class="rook">R</span>':'')+'</td><td><span class="pill '+r.pos+'">'+r.pos+'</span></td><td>'+r.team+'</td><td class="num">'+val(r).toFixed(1)+'</td></tr>'; });
     html+='</tbody></table>'; $('tt_myteam').innerHTML=html; show('tt_myteam');
   }
-  function leagueAvgPos(){ var tot={QB:0,RB:0,WR:0,TE:0}; teams.forEach(function(t){var pb=posBreak(t);tot.QB+=pb.QB;tot.RB+=pb.RB;tot.WR+=pb.WR;tot.TE+=pb.TE;}); var n=teams.length||1; return {QB:tot.QB/n,RB:tot.RB/n,WR:tot.WR/n,TE:tot.TE/n}; }
+  function leagueAvgStarterPos(){ var tot={QB:0,RB:0,WR:0,TE:0};
+    teams.forEach(function(t){ optimalStarters(t.recs).starters.forEach(function(s){ if(tot[s.r.pos]!=null) tot[s.r.pos]+=val(s.r); }); });
+    var n=teams.length||1; return {QB:tot.QB/n,RB:tot.RB/n,WR:tot.WR/n,TE:tot.TE/n};
+  }
   function renderFix(){
     var t=teams.filter(function(x){return x.isMine;})[0]; if(!t){ $('tt_fix').style.display='none'; return; }
-    var mine=posBreak(t), avg=leagueAvgPos();
-    var diffs=['QB','RB','WR','TE'].map(function(p){return {p:p,d:mine[p]-avg[p]};}).sort(function(a,b){return a.d-b.d;});
-    var html='<h2>Fix your team</h2><table><thead><tr><th>Pos</th><th class="num">You</th><th class="num">Lg avg</th><th class="num">Diff</th></tr></thead><tbody>';
-    diffs.forEach(function(x){ var cls=x.d<0?'weak':'strong'; html+='<tr><td>'+x.p+'</td><td class="num">'+mine[x.p].toFixed(0)+'</td><td class="num">'+avg[x.p].toFixed(0)+'</td><td class="num '+cls+'">'+(x.d>=0?'+':'')+x.d.toFixed(0)+'</td></tr>'; });
+    var mineStart={QB:0,RB:0,WR:0,TE:0}; optimalStarters(t.recs).starters.forEach(function(s){ if(mineStart[s.r.pos]!=null) mineStart[s.r.pos]+=val(s.r); });
+    var avg=leagueAvgStarterPos();
+    var diffs=['QB','RB','WR','TE'].map(function(p){return {p:p,d:mineStart[p]-avg[p]};}).sort(function(a,b){return a.d-b.d;});
+    var html='<h2>Fix your team</h2><p>Your <b>starting</b> strength vs league average:</p><table><thead><tr><th>Pos</th><th class="num">You</th><th class="num">Lg avg</th><th class="num">Diff</th></tr></thead><tbody>';
+    diffs.forEach(function(x){ var cls=x.d<0?'weak':'strong'; html+='<tr><td>'+x.p+'</td><td class="num">'+mineStart[x.p].toFixed(0)+'</td><td class="num">'+avg[x.p].toFixed(0)+'</td><td class="num '+cls+'">'+(x.d>=0?'+':'')+x.d.toFixed(0)+'</td></tr>'; });
     html+='</tbody></table>';
     var weak=diffs[0].p;
-    var avail=DATA.filter(function(r){return r.pos===weak && !ROSTERED.has(nrm(r.name)+'|'+r.pos);}).sort(function(a,b){return val(b)-val(a);}).slice(0,6);
-    html+='<p>Weakest spot: <b class="weak">'+weak+'</b>. Top free agents (unrostered '+weak+'s):</p><ul>';
-    avail.forEach(function(r){ html+='<li>'+r.name+' ('+r.team+') — '+fmtLbl()+' '+val(r).toFixed(1)+(r.is_rookie?' (R)':'')+'</li>'; });
+    var fa=DATA.filter(function(r){return r.pos===weak && !ROSTERED.has(nrm(r.name)+'|'+r.pos);}).sort(function(a,b){return val(b)-val(a);}).slice(0,5);
+    var targets=[]; teams.forEach(function(ot){ if(ot.isMine) return; ot.recs.forEach(function(r){ if(r.pos===weak) targets.push({r:r,team:ot.name}); }); });
+    targets.sort(function(a,b){return val(b.r)-val(a.r);}); targets=targets.slice(0,5);
+    html+='<p>Weakest starting spot: <b class="weak">'+weak+'</b>.</p><p><b>Waiver (free agents):</b></p><ul>';
+    if(!fa.length) html+='<li><small>none meaningfully available</small></li>';
+    fa.forEach(function(r){ html+='<li>'+r.name+' ('+r.team+') — '+fmtLbl()+' '+val(r).toFixed(1)+(r.is_rookie?' (R)':'')+'</li>'; });
+    html+='</ul><p><b>Trade targets (on other rosters):</b></p><ul>';
+    targets.forEach(function(x){ html+='<li>'+x.r.name+' ('+x.r.team+') — '+fmtLbl()+' '+val(x.r).toFixed(1)+' · on '+x.team+'</li>'; });
     html+='</ul>'; $('tt_fix').innerHTML=html; show('tt_fix');
   }
   function renderTrade(){
-    var html='<h2>Trade evaluator</h2><div class="bar"><select id="tt_tA"></select><span>vs</span><select id="tt_tB"></select></div><div class="tradebox"><div class="tradecol" id="tt_colA"></div><div class="tradecol" id="tt_colB"></div></div><div id="tt_tradeResult" style="margin-top:10px"></div>';
+    var html='<h2>Trade evaluator</h2><div class="bar"><select id="tt_tA"></select><span>(you)</span><span>vs</span><select id="tt_tB"></select></div><div class="tradebox"><div class="tradecol" id="tt_colA"></div><div class="tradecol" id="tt_colB"></div></div><div id="tt_tradeResult" style="margin-top:10px"></div>';
     $('tt_trade').innerHTML=html; show('tt_trade');
     var opts=teams.map(function(t,i){return '<option value="'+i+'">'+t.name+'</option>';}).join('');
     var a=$('tt_tA'), b=$('tt_tB'); a.innerHTML=opts; b.innerHTML=opts;
     var mi=-1; teams.forEach(function(t,i){if(t.isMine)mi=i;}); a.value=mi>=0?mi:0; b.value=(a.value==0?1:0);
-    function col(t){ return '<b>'+t.name+'</b>'+t.recs.slice().sort(function(x,y){return val(y)-val(x);}).map(function(r){return '<label class="chk"><span><input type="checkbox" data-v="'+val(r).toFixed(1)+'"> '+r.name+' <span class="pill '+r.pos+'">'+r.pos+'</span></span><span class="val">'+val(r).toFixed(1)+'</span></label>';}).join(''); }
+    function col(t){ return '<b>'+t.name+'</b>'+t.recs.slice().sort(function(x,y){return val(y)-val(x);}).map(function(r){return '<label class="chk"><span><input type="checkbox" data-v="'+val(r).toFixed(1)+'" data-nm="'+r.name+'" data-pos="'+r.pos+'"> '+r.name+' <span class="pill '+r.pos+'">'+r.pos+'</span></span><span class="val">'+val(r).toFixed(1)+'</span></label>';}).join(''); }
     function refresh(){ $('tt_colA').innerHTML=col(teams[a.value]); $('tt_colB').innerHTML=col(teams[b.value]); $('tt_tradeResult').innerHTML=''; }
-    function calc(){ function sum(id){ return [].slice.call(document.querySelectorAll('#'+id+' input:checked')).reduce(function(s,e){return s+parseFloat(e.dataset.v);},0); }
-      var sA=sum('tt_colA'), sB=sum('tt_colB'), d=sA-sB;
-      $('tt_tradeResult').innerHTML='You send '+sA.toFixed(1)+' vs receive '+sB.toFixed(1)+' — '+(Math.abs(d)<3?'<b>even trade</b>':(d>0?'<b class="weak">you give up '+d.toFixed(1)+'</b>':'<b class="strong">you gain '+(-d).toFixed(1)+'</b>')); }
+    function calc(){
+      var ca=[].slice.call(document.querySelectorAll('#tt_colA input:checked'));
+      var cb=[].slice.call(document.querySelectorAll('#tt_colB input:checked'));
+      var sA=ca.reduce(function(s,e){return s+parseFloat(e.dataset.v);},0);
+      var sB=cb.reduce(function(s,e){return s+parseFloat(e.dataset.v);},0);
+      var d=sA-sB;
+      var msg='You send '+sA.toFixed(1)+' vs receive '+sB.toFixed(1)+' — '+(Math.abs(d)<3?'<b>even value</b>':(d>0?'<b class="weak">you give up '+d.toFixed(1)+'</b>':'<b class="strong">you gain '+(-d).toFixed(1)+'</b>'));
+      var tA=teams[a.value];
+      var give={}; ca.forEach(function(e){give[e.dataset.nm+'|'+e.dataset.pos]=1;});
+      var getRecs=cb.map(function(e){return TB[nrm(e.dataset.nm)+'|'+e.dataset.pos];}).filter(Boolean);
+      var newRecs=tA.recs.filter(function(r){return !give[r.name+'|'+r.pos];}).concat(getRecs);
+      var before=optimalStarters(tA.recs).value, after=optimalStarters(newRecs).value, li=after-before;
+      msg+='<br><small>'+tA.name+' starting lineup: '+before.toFixed(0)+' → '+after.toFixed(0)+' (<b class="'+(li>=0?'strong':'weak')+'">'+(li>=0?'+':'')+li.toFixed(0)+'</b>)</small>';
+      $('tt_tradeResult').innerHTML=msg;
+    }
     a.onchange=refresh; b.onchange=refresh; $('tt_trade').addEventListener('change',function(e){ if(e.target.type==='checkbox') calc(); }); refresh();
   }
   $('tt_loadUserBtn').addEventListener('click', loadUser);
