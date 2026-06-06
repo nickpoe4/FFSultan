@@ -84,6 +84,7 @@ def rookie_base(rookies, hist):
     out = pd.DataFrame({
         "player_id": d["player_id"], "player_display_name": d["full_name"],
         "position": d["position"], "team2026": d["team"], "age": d["age"],
+        "pick": d["pick"],
         "tgt_pg": d["tgt_pg"], "car_pg": d["car_pg"],
         "ypt": d["ypt"], "catch_rate": d["catch_rate"], "rec_td_rate": d["rec_td_rate"],
         "adot": d["adot"], "ypc": d["ypc"], "rush_td_rate": d["rush_td_rate"],

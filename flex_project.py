@@ -215,6 +215,33 @@ def distribute_team(team_df, team_tgt_pg, team_car_pg):
     return d
 
 
+def _displace_incumbents(base):
+    """Rookie-overtakes-incumbent: a high-capital rookie reduces the incumbent
+    veterans' projected share at his team+position. Steeper for RB (one lead back),
+    lighter for WR (rooms are deeper)."""
+    if "pick" not in base.columns or "is_rookie" not in base.columns:
+        return base
+    base = base.copy()
+    for team, g in base.groupby("team2026"):
+        # RB lead-back displacement
+        rr = g[(g["position"] == "RB") & (g["is_rookie"] == 1)]
+        if len(rr):
+            mp = rr["pick"].min()
+            f = 0.50 if mp <= 15 else (0.68 if mp <= 45 else 0.85)
+            idx = g[(g["position"] == "RB") & (g["is_rookie"] == 0)].index
+            base.loc[idx, "car_pg"] = base.loc[idx, "car_pg"] * f
+            base.loc[idx, "tgt_pg"] = base.loc[idx, "tgt_pg"] * (0.5 + 0.5 * f)
+        # WR displacement (only very early picks, mild)
+        wr = g[(g["position"] == "WR") & (g["is_rookie"] == 1)]
+        if len(wr):
+            mp = wr["pick"].min()
+            if mp <= 32:
+                fw = 0.85 if mp <= 15 else 0.93
+                idx = g[(g["position"] == "WR") & (g["is_rookie"] == 0)].index
+                base.loc[idx, "tgt_pg"] = base.loc[idx, "tgt_pg"] * fw
+    return base
+
+
 def project(hist, rosters, method="scheme", rookie_base=None):
     """rosters: player_id, team (2026), position, optional age.
     method='scheme' (Level 2, positional-split + concentration aware) or 'flat' (Level 1).
@@ -227,6 +254,7 @@ def project(hist, rosters, method="scheme", rookie_base=None):
         base = pd.concat([base, rookie_base], ignore_index=True, sort=False)
     if "is_rookie" in base.columns:
         base["is_rookie"] = base["is_rookie"].fillna(0).astype(int)
+        base = _displace_incumbents(base)
     tv, lg_t, lg_c = team_volume(hist)
     tvmap = tv.set_index("recent_team")
     tend, lg_split = team_tendencies(hist)
