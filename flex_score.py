@@ -41,18 +41,19 @@ PROD_W = 0.25
 
 # component metrics feeding each grade, per position
 GRADE_INPUTS = {
+    # 'rz_tgt_share' / 'rz_rush_share' are used only when present (red-zone data on)
     "WR": {
-        "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game"],
+        "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game", "rz_tgt_share"],
         "efficiency": ["yards_per_target", "catch_rate", "td_per_target"],
         "context": ["plays_per_game", "proe", "pass_rate"],
     },
     "TE": {
-        "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game"],
+        "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game", "rz_tgt_share"],
         "efficiency": ["yards_per_target", "catch_rate", "td_per_target"],
         "context": ["plays_per_game", "proe", "pass_rate"],
     },
     "RB": {
-        "opportunity": ["rush_share", "carries_per_game", "touch_share", "tgts_per_game"],
+        "opportunity": ["rush_share", "carries_per_game", "touch_share", "tgts_per_game", "rz_rush_share"],
         "efficiency": ["yards_per_carry", "yards_per_touch", "catch_rate", "td_per_touch"],
         "context": ["plays_per_game", "run_rate"],
     },

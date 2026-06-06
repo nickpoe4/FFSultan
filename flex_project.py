@@ -66,6 +66,7 @@ def weighted_baseline(hist):
     h["w"] = h["season"].map(w)
     stat = ["targets", "receptions", "rec_yards", "rec_tds", "air_yards",
             "carries", "rush_yards", "rush_tds"]
+    stat += [c for c in ["rz_targets", "rz_carries"] if c in h.columns]  # red-zone (optional)
     for c in stat:
         h["W_" + c] = h["w"] * h[c]
     h["W_games"] = h["w"] * h["games"]
@@ -103,6 +104,12 @@ def weighted_baseline(hist):
         out.loc[idx, "adot"] = out.loc[idx, "adot"].fillna(m_adot)
         out.loc[idx, "ypc"] = (out.loc[idx, "ypc"].fillna(m_ypc) * wc + m_ypc * K_CAR) / (wc + K_CAR)
         out.loc[idx, "rush_td_rate"] = (out.loc[idx, "rush_td_rate"].fillna(m_rrtd) * wc + m_rrtd * K_CAR) / (wc + K_CAR)
+
+    # red-zone propensity (share of a player's targets/carries that come in the RZ)
+    if "W_rz_targets" in g.columns:
+        out["rz_tgt_rate"] = (g["W_rz_targets"] / g["W_targets"].replace(0, np.nan)).clip(0, 1)
+    if "W_rz_carries" in g.columns:
+        out["rz_car_rate"] = (g["W_rz_carries"] / g["W_carries"].replace(0, np.nan)).clip(0, 1)
     return out.drop(columns=["_Wt", "_Wc"])
 
 
@@ -275,10 +282,20 @@ def project(hist, rosters, method="scheme", rookie_base=None):
     p["carries"] = p["proj_car_pg"] * PROJ_GAMES
     p["receptions"] = p["targets"] * p["catch_rate"]
     p["rec_yards"] = p["targets"] * p["ypt"]
-    p["rec_tds"] = p["targets"] * p["rec_td_rate"]
     p["rush_yards"] = p["carries"] * p["ypc"]
-    p["rush_tds"] = p["carries"] * p["rush_td_rate"]
     p["air_yards"] = p["targets"] * p["adot"]
+
+    # TD projection: red-zone-driven when RZ data is present, else flat historical rate
+    if "rz_tgt_rate" in p.columns or "rz_car_rate" in p.columns:
+        RZ_T_TD, NON_T_TD = 0.19, 0.018   # TD per RZ target / per non-RZ target
+        RZ_C_TD, NON_C_TD = 0.11, 0.006   # TD per RZ carry / per non-RZ carry
+        p["proj_rz_targets"] = p["targets"] * p.get("rz_tgt_rate", pd.Series(0, index=p.index)).fillna(0)
+        p["proj_rz_carries"] = p["carries"] * p.get("rz_car_rate", pd.Series(0, index=p.index)).fillna(0)
+        p["rec_tds"] = p["proj_rz_targets"] * RZ_T_TD + (p["targets"] - p["proj_rz_targets"]) * NON_T_TD
+        p["rush_tds"] = p["proj_rz_carries"] * RZ_C_TD + (p["carries"] - p["proj_rz_carries"]) * NON_C_TD
+    else:
+        p["rec_tds"] = p["targets"] * p["rec_td_rate"]
+        p["rush_tds"] = p["carries"] * p["rush_td_rate"]
 
     # age adjustment (scales volume-driven production)
     if "age" in p.columns:
@@ -295,6 +312,11 @@ def project(hist, rosters, method="scheme", rookie_base=None):
     # projected team totals for shares
     p["team_targets"] = p.groupby("team2026")["targets"].transform("sum")
     p["team_carries"] = p.groupby("team2026")["carries"].transform("sum")
+
+    # projected red-zone shares (for the Opportunity grade)
+    if "proj_rz_targets" in p.columns:
+        p["rz_tgt_share"] = p["proj_rz_targets"] / p.groupby("team2026")["proj_rz_targets"].transform("sum").replace(0, np.nan)
+        p["rz_rush_share"] = p["proj_rz_carries"] / p.groupby("team2026")["proj_rz_carries"].transform("sum").replace(0, np.nan)
 
     # full flex_spine-schema derivations so the scoring engine consumes it directly
     p["ppr"] = (p["receptions"] + 0.1 * p["rec_yards"] + 6 * p["rec_tds"]
@@ -331,6 +353,9 @@ def project(hist, rosters, method="scheme", rookie_base=None):
             "pts_ppr", "pts_half", "pts_std", "ppg_ppr", "ppg_half", "ppg_std",
             "yards_per_target", "yards_per_carry", "catch_rate", "total_tds", "total_yards",
             "plays_per_game", "pass_rate", "proe"]
+    for c in ["rz_tgt_share", "rz_rush_share"]:   # red-zone shares (optional)
+        if c in p.columns:
+            cols.append(c)
     if "headshot_url" in p.columns:   # already carried through from the roster merge
         cols.append("headshot_url")
     if "age" in p.columns:

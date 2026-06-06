@@ -123,6 +123,36 @@ def build_player_spine(weekly: pd.DataFrame) -> pd.DataFrame:
 # ----------------------------------------------------------------------------
 # Team context - pace / pass tendency / PROE (one row per team-season)
 # ----------------------------------------------------------------------------
+def build_redzone(pbp: pd.DataFrame):
+    """Player + team red-zone (inside the 20) target/carry counts from play-by-play."""
+    df = pbp.copy()
+    for c in ["yardline_100", "pass", "rush", "season", "posteam"]:
+        if c not in df.columns:
+            df[c] = np.nan
+    rz = df[df["yardline_100"] <= 20]
+    pt = rz[rz["pass"] == 1].groupby(["receiver_player_id", "season"]).size().rename("rz_targets").reset_index()
+    pt = pt.rename(columns={"receiver_player_id": "player_id"})
+    pc = rz[rz["rush"] == 1].groupby(["rusher_player_id", "season"]).size().rename("rz_carries").reset_index()
+    pc = pc.rename(columns={"rusher_player_id": "player_id"})
+    player = pt.merge(pc, on=["player_id", "season"], how="outer")
+    tt = rz[rz["pass"] == 1].groupby(["posteam", "season"]).size().rename("team_rz_targets").reset_index()
+    tc = rz[rz["rush"] == 1].groupby(["posteam", "season"]).size().rename("team_rz_carries").reset_index()
+    team = tt.merge(tc, on=["posteam", "season"], how="outer").rename(columns={"posteam": "recent_team"})
+    return player, team
+
+
+def add_redzone(spine: pd.DataFrame, pbp: pd.DataFrame) -> pd.DataFrame:
+    """Merge red-zone usage onto the spine and compute RZ shares."""
+    player, team = build_redzone(pbp)
+    spine = spine.merge(player, on=["player_id", "season"], how="left")
+    spine = spine.merge(team, on=["recent_team", "season"], how="left")
+    for c in ["rz_targets", "rz_carries", "team_rz_targets", "team_rz_carries"]:
+        spine[c] = spine[c].fillna(0)
+    spine["rz_tgt_share"] = spine["rz_targets"] / spine["team_rz_targets"].replace(0, np.nan)
+    spine["rz_rush_share"] = spine["rz_carries"] / spine["team_rz_carries"].replace(0, np.nan)
+    return spine
+
+
 def build_team_context(pbp: pd.DataFrame) -> pd.DataFrame:
     for c in ["pass", "rush", "pass_oe"]:
         if c not in pbp.columns:

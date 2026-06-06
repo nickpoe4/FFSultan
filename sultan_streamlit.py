@@ -44,10 +44,11 @@ def _pull(fn, season):
 def load_history():
     spine = flex_spine.build_player_spine(flex_spine.load_weekly(nfl, SEASONS))
     try:
-        spine = spine.merge(flex_spine.build_team_context(_pd(nfl.load_pbp(SEASONS))),
-                            on=["recent_team", "season"], how="left")
+        pbp = _pd(nfl.load_pbp(SEASONS))
+        spine = spine.merge(flex_spine.build_team_context(pbp), on=["recent_team", "season"], how="left")
+        spine = flex_spine.add_redzone(spine, pbp)   # red-zone usage, live
     except Exception as e:
-        st.warning(f"Team context skipped: {e}")
+        st.warning(f"Team context / red-zone skipped: {e}")
     try:
         ros = _pd(nfl.load_rosters(SEASONS))
         idc = "gsis_id" if "gsis_id" in ros.columns else "player_id"
