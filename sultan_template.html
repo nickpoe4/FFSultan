@@ -72,6 +72,45 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
 .fav{display:inline-flex;align-items:center;justify-content:center;color:#10081f;font-weight:700;}
 .face.fav{font-size:11px;}.facebig.fav{font-size:22px;}
 .hide{display:none;}
+
+#viewnav{margin-right:6px;}
+#view-team{padding:16px 20px 60px;}
+#view-team .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+#view-team input,#view-team select{padding:8px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg2);color:#fff;font-size:13px;}
+#view-team button{padding:8px 14px;border-radius:8px;border:0;background:var(--pink);color:#2a0a22;font-weight:700;cursor:pointer;}
+#view-team .seg button{background:transparent;color:var(--muted);}
+#view-team .seg button.on{background:var(--cyan);color:#06262a;}
+#tt_status{color:var(--muted);font-size:13px;margin:6px 0;min-height:18px;}
+.tcard{background:rgba(30,15,61,.55);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0;}
+.tcard h2{font-family:var(--disp);font-size:14px;letter-spacing:2px;color:var(--cyan);margin:0 0 10px;}
+.tcard table{width:100%;border-collapse:collapse;font-size:13px;}
+.tcard .val{font-family:var(--num);color:var(--cyan);font-weight:700;}
+.tcard .mine{color:var(--gold);font-weight:700;}
+.tcard .weak{color:#ff7a7a;}.tcard .strong{color:#37e0a0;}
+.tcard .pill{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#0a0420;}
+.tcard .pill.RB{background:#37e0a0;}.tcard .pill.WR{background:var(--cyan);}.tcard .pill.TE{background:var(--gold);}
+.tradebox{display:flex;gap:18px;flex-wrap:wrap;}.tradecol{flex:1;min-width:260px;}
+.chk{font-size:13px;padding:3px 0;display:flex;justify-content:space-between;gap:8px;}
+
+@media (max-width:640px){
+ header{padding:10px 12px;gap:8px;flex-wrap:wrap;}
+ .brand h1{font-size:18px;letter-spacing:2px;}
+ .controls{gap:6px;width:100%;margin-left:0;}
+ input[type=search]{min-width:110px;flex:1;}
+ .wrap{padding:10px 10px 50px;overflow-x:auto;}
+ .tcard{overflow-x:auto;}
+ table{font-size:12px;}
+ th,td{padding:6px 6px;}
+ #tbl th:nth-child(3),#tbl td:nth-child(3),
+ #tbl th:nth-child(6),#tbl td:nth-child(6),
+ #tbl th:nth-child(7),#tbl td:nth-child(7),
+ #tbl th:nth-child(8),#tbl td:nth-child(8){display:none;}
+ .face{width:26px;height:26px;margin-right:6px;}
+ .facebig{width:54px;height:54px;}
+ .card{max-width:94vw;}
+ #view-team{padding:10px 10px 50px;}
+ .myrank{width:44px;}
+}
 </style>
 </head>
 <body>
@@ -86,7 +125,8 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
     </svg>
     <div><h1>SULTAN</h1><div class="tag">fantasy football model</div></div>
   </div>
-  <div class="controls">
+  <div class="seg" id="viewnav"><button data-v="rankings" class="on">Rankings</button><button data-v="team">Team&nbsp;Tools</button></div>
+    <div class="controls">
     <div class="seg" id="mode"><button data-m="redraft" class="on">Redraft</button><button data-m="dynasty">Dynasty</button></div>
     <div class="seg" id="fmt"><button data-f="ppr" class="on">PPR</button><button data-f="half">Half&nbsp;PPR</button></div>
     <div class="seg" id="pos"><button data-p="ALL" class="on">All</button><button data-p="RB">RB</button><button data-p="WR">WR</button><button data-p="TE">TE</button></div>
@@ -95,7 +135,7 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
   </div>
 </header>
 <div class="wrap">
-  <p class="note">Sultan · 2026 · toggle Redraft/Dynasty · MASTER = unbiased avg of Model + My + Analyst (edit My Rank → live) · click any row for the full profile · edit <b>My Rank</b> and the <b>MASTER</b> updates live (MASTER = average of Model + My, more sources coming).</p>
+  <p class="note">Sultan · 2026 · Redraft/Dynasty · red-zone + rookie-displacement calibrations on · MASTER = unbiased avg of Model + My + Analyst (live) · click any row for the full profile · edit <b>My Rank</b> and the <b>MASTER</b> updates live (MASTER = average of Model + My, more sources coming).</p>
   <table id="tbl"><thead><tr>
     <th data-k="modelRank" class="num">#</th>
     <th data-k="name">Player</th>
@@ -113,6 +153,22 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
   <p class="legend">Grades are percentile (0–100) vs. positional peers. Overall = role grade (Opp/Eff/Ctx, context down-weighted) blended 75/25 with production. Weights are tunable.</p>
 </div>
 
+<div id="view-team" style="display:none">
+  <div class="bar">
+    <input id="tt_user" placeholder="Sleeper username" size="16"/>
+    <input id="tt_season" value="2026" size="5"/>
+    <button id="tt_loadUserBtn">Load leagues</button>
+    <select id="tt_league" style="display:none"></select>
+    <button id="tt_loadLeagueBtn" style="display:none;background:var(--bg2);color:var(--cyan);border:1px solid var(--cyan)">Load league</button>
+    <span class="seg" id="tt_mode"><button data-m="redraft" class="on">Redraft</button><button data-m="dynasty">Dynasty</button></span>
+    <span class="seg" id="tt_fmt"><button data-f="ppr" class="on">PPR</button><button data-f="half">Half</button></span>
+  </div>
+  <div id="tt_status">Enter your Sleeper username and click Load leagues.</div>
+  <div id="tt_rankings" class="tcard" style="display:none"></div>
+  <div id="tt_myteam" class="tcard" style="display:none"></div>
+  <div id="tt_fix" class="tcard" style="display:none"></div>
+  <div id="tt_trade" class="tcard" style="display:none"></div>
+</div>
 <div id="scrim"><div class="card" id="card"></div></div>
 
 <script>
@@ -227,6 +283,111 @@ document.getElementById('rows').addEventListener('click',e=>{ const tr=e.target.
 document.getElementById('rows').addEventListener('change',e=>{ if(e.target.classList.contains('myrank')){ const nm=decodeURIComponent(e.target.dataset.name); myRanks[fmt+'|'+nm]=e.target.value; localStorage.setItem(MR_KEY, JSON.stringify(myRanks)); render(); }});
 document.getElementById('scrim').addEventListener('click',e=>{ if(e.target.id==='scrim') closeCard(); });
 render();
+
+document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) return;
+  var v=e.target.dataset.v; [].forEach.call(e.currentTarget.children,function(b){b.classList.toggle('on',b===e.target);});
+  document.querySelector('.controls').style.display = v==='team'?'none':'';
+  document.querySelector('.wrap').style.display = v==='team'?'none':'';
+  document.getElementById('view-team').style.display = v==='team'?'':'none';
+};
+(function(){
+  var SLEEPER='https://api.sleeper.app/v1';
+  var mode='redraft', fmt='ppr', playersMap=null, leagues=[], myUserId=null, rosters=[], usersById={}, teams=[];
+  var ROSTERED=new Set();
+  function nrm(s){return (s||'').toLowerCase().replace(/[^a-z ]/g,'').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/\s+/g,'');}
+  var TB={}; DATA.forEach(function(r){TB[nrm(r.name)+'|'+r.pos]=r;});
+  function val(r){ if(!r) return 0; return mode==='dynasty'? r.dyn_score : (fmt==='ppr'? r.overall_ppr : r.overall_half); }
+  var $=function(id){return document.getElementById(id);};
+  function setStatus(s){ $('tt_status').textContent=s; }
+  function jget(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(u.split('/v1')[1]+' → '+r.status); return r.json(); }); }
+  function loadUser(){
+    var u=$('tt_user').value.trim(); if(!u){ setStatus('Type your Sleeper username first.'); return; }
+    setStatus('Loading user…');
+    jget(SLEEPER+'/user/'+u).then(function(user){
+      if(!user||!user.user_id){ setStatus('User not found: '+u); return Promise.reject('x'); }
+      myUserId=user.user_id; var season=$('tt_season').value||'2026';
+      return jget(SLEEPER+'/user/'+myUserId+'/leagues/nfl/'+season);
+    }).then(function(ls){ if(!ls){return;} leagues=ls;
+      if(!ls.length){ setStatus('No leagues found for that season.'); return; }
+      var sel=$('tt_league'); sel.innerHTML=ls.map(function(l){return '<option value="'+l.league_id+'">'+l.name+'</option>';}).join('');
+      sel.style.display=''; $('tt_loadLeagueBtn').style.display='';
+      setStatus('Found '+ls.length+' league(s). Pick one → Load league.');
+    }).catch(function(e){ if(e!=='x') setStatus('Error: '+(e.message||e)); });
+  }
+  function ensurePlayers(){ if(playersMap) return Promise.resolve(); setStatus('Loading Sleeper player map (~5MB, one-time)…'); return jget(SLEEPER+'/players/nfl').then(function(m){playersMap=m;}); }
+  function recFor(pid){ var p=playersMap[pid]; if(!p) return null; var nm=p.full_name||((p.first_name||'')+' '+(p.last_name||'')); return TB[nrm(nm)+'|'+(p.position||'')]||null; }
+  function loadLeague(){
+    var leagueId=$('tt_league').value; setStatus('Loading league…');
+    ensurePlayers().then(function(){ return jget(SLEEPER+'/league/'+leagueId+'/rosters'); }).then(function(rs){ rosters=rs;
+      return jget(SLEEPER+'/league/'+leagueId+'/users');
+    }).then(function(us){ usersById={}; us.forEach(function(u){usersById[u.user_id]=u;});
+      buildTeams(); renderAll(); setStatus('Loaded '+teams.length+' teams.');
+    }).catch(function(e){ setStatus('Error: '+(e.message||e)); });
+  }
+  function buildTeams(){ ROSTERED.clear();
+    teams=rosters.map(function(ro){ var owner=usersById[ro.owner_id]||{};
+      var recs=(ro.players||[]).map(recFor).filter(Boolean);
+      recs.forEach(function(r){ROSTERED.add(nrm(r.name)+'|'+r.pos);});
+      return {rid:ro.roster_id, ownerId:ro.owner_id,
+        name:(owner.metadata&&owner.metadata.team_name)||owner.display_name||('Team '+ro.roster_id),
+        isMine: ro.owner_id===myUserId, recs:recs};
+    });
+  }
+  function teamValue(t){ return t.recs.reduce(function(a,r){return a+val(r);},0); }
+  function posBreak(t){ var o={RB:0,WR:0,TE:0}; t.recs.forEach(function(r){o[r.pos]=(o[r.pos]||0)+val(r);}); return o; }
+  function show(id){ $(id).style.display=''; }
+  function fmtLbl(){ return mode==='dynasty'?'Dynasty':fmt.toUpperCase(); }
+  function renderAll(){ renderRankings(); renderMyTeam(); renderFix(); renderTrade(); }
+  function renderRankings(){
+    var ts=teams.slice().sort(function(a,b){return teamValue(b)-teamValue(a);});
+    var html='<h2>League power rankings</h2><table><thead><tr><th>#</th><th>Team</th><th class="num">Total</th><th class="num">RB</th><th class="num">WR</th><th class="num">TE</th></tr></thead><tbody>';
+    ts.forEach(function(t,i){ var pb=posBreak(t);
+      html+='<tr class="'+(t.isMine?'mine':'')+'"><td>'+(i+1)+'</td><td>'+t.name+(t.isMine?' ★':'')+'</td><td class="num val">'+teamValue(t).toFixed(0)+'</td><td class="num">'+pb.RB.toFixed(0)+'</td><td class="num">'+pb.WR.toFixed(0)+'</td><td class="num">'+pb.TE.toFixed(0)+'</td></tr>';
+    });
+    html+='</tbody></table><small>Total = sum of rostered RB/WR/TE '+fmtLbl()+' Overall. QBs not modeled yet.</small>';
+    $('tt_rankings').innerHTML=html; show('tt_rankings');
+  }
+  function renderMyTeam(){
+    var t=teams.filter(function(x){return x.isMine;})[0];
+    if(!t){ $('tt_myteam').innerHTML='<h2>My team</h2><small>Could not match your username to a team here.</small>'; show('tt_myteam'); return; }
+    var recs=t.recs.slice().sort(function(a,b){return val(b)-val(a);});
+    var html='<h2>My team — '+t.name+'</h2><table><thead><tr><th>Player</th><th>Pos</th><th>Tm</th><th class="num">Overall</th></tr></thead><tbody>';
+    recs.forEach(function(r){ html+='<tr><td>'+r.name+(r.is_rookie?' <span class="rook">R</span>':'')+'</td><td><span class="pill '+r.pos+'">'+r.pos+'</span></td><td>'+r.team+'</td><td class="num val">'+val(r).toFixed(1)+'</td></tr>'; });
+    html+='</tbody></table>'; $('tt_myteam').innerHTML=html; show('tt_myteam');
+  }
+  function leagueAvgPos(){ var tot={RB:0,WR:0,TE:0}; teams.forEach(function(t){var pb=posBreak(t);tot.RB+=pb.RB;tot.WR+=pb.WR;tot.TE+=pb.TE;}); var n=teams.length||1; return {RB:tot.RB/n,WR:tot.WR/n,TE:tot.TE/n}; }
+  function renderFix(){
+    var t=teams.filter(function(x){return x.isMine;})[0]; if(!t){ $('tt_fix').style.display='none'; return; }
+    var mine=posBreak(t), avg=leagueAvgPos();
+    var diffs=['RB','WR','TE'].map(function(p){return {p:p,d:mine[p]-avg[p]};}).sort(function(a,b){return a.d-b.d;});
+    var html='<h2>Fix your team</h2><table><thead><tr><th>Pos</th><th class="num">You</th><th class="num">Lg avg</th><th class="num">Diff</th></tr></thead><tbody>';
+    diffs.forEach(function(x){ var cls=x.d<0?'weak':'strong'; html+='<tr><td>'+x.p+'</td><td class="num">'+mine[x.p].toFixed(0)+'</td><td class="num">'+avg[x.p].toFixed(0)+'</td><td class="num '+cls+'">'+(x.d>=0?'+':'')+x.d.toFixed(0)+'</td></tr>'; });
+    html+='</tbody></table>';
+    var weak=diffs[0].p;
+    var avail=DATA.filter(function(r){return r.pos===weak && !ROSTERED.has(nrm(r.name)+'|'+r.pos);}).sort(function(a,b){return val(b)-val(a);}).slice(0,6);
+    html+='<p>Weakest spot: <b class="weak">'+weak+'</b>. Top free agents (unrostered '+weak+'s):</p><ul>';
+    avail.forEach(function(r){ html+='<li>'+r.name+' ('+r.team+') — '+fmtLbl()+' '+val(r).toFixed(1)+(r.is_rookie?' (R)':'')+'</li>'; });
+    html+='</ul>'; $('tt_fix').innerHTML=html; show('tt_fix');
+  }
+  function renderTrade(){
+    var html='<h2>Trade evaluator</h2><div class="bar"><select id="tt_tA"></select><span>vs</span><select id="tt_tB"></select></div><div class="tradebox"><div class="tradecol" id="tt_colA"></div><div class="tradecol" id="tt_colB"></div></div><div id="tt_tradeResult" style="margin-top:10px"></div>';
+    $('tt_trade').innerHTML=html; show('tt_trade');
+    var opts=teams.map(function(t,i){return '<option value="'+i+'">'+t.name+'</option>';}).join('');
+    var a=$('tt_tA'), b=$('tt_tB'); a.innerHTML=opts; b.innerHTML=opts;
+    var mi=-1; teams.forEach(function(t,i){if(t.isMine)mi=i;}); a.value=mi>=0?mi:0; b.value=(a.value==0?1:0);
+    function col(t){ return '<b>'+t.name+'</b>'+t.recs.slice().sort(function(x,y){return val(y)-val(x);}).map(function(r){return '<label class="chk"><span><input type="checkbox" data-v="'+val(r).toFixed(1)+'"> '+r.name+' <span class="pill '+r.pos+'">'+r.pos+'</span></span><span class="val">'+val(r).toFixed(1)+'</span></label>';}).join(''); }
+    function refresh(){ $('tt_colA').innerHTML=col(teams[a.value]); $('tt_colB').innerHTML=col(teams[b.value]); $('tt_tradeResult').innerHTML=''; }
+    function calc(){ function sum(id){ return [].slice.call(document.querySelectorAll('#'+id+' input:checked')).reduce(function(s,e){return s+parseFloat(e.dataset.v);},0); }
+      var sA=sum('tt_colA'), sB=sum('tt_colB'), d=sA-sB;
+      $('tt_tradeResult').innerHTML='You send '+sA.toFixed(1)+' vs receive '+sB.toFixed(1)+' — '+(Math.abs(d)<3?'<b>even trade</b>':(d>0?'<b class="weak">you give up '+d.toFixed(1)+'</b>':'<b class="strong">you gain '+(-d).toFixed(1)+'</b>')); }
+    a.onchange=refresh; b.onchange=refresh; $('tt_trade').addEventListener('change',function(e){ if(e.target.type==='checkbox') calc(); }); refresh();
+  }
+  $('tt_loadUserBtn').addEventListener('click', loadUser);
+  $('tt_loadLeagueBtn').addEventListener('click', loadLeague);
+  $('tt_mode').addEventListener('click', function(e){ if(e.target.dataset.m){ mode=e.target.dataset.m; [].forEach.call(e.currentTarget.children,function(b){b.classList.toggle('on',b===e.target);}); if(teams.length) renderAll(); }});
+  $('tt_fmt').addEventListener('click', function(e){ if(e.target.dataset.f){ fmt=e.target.dataset.f; [].forEach.call(e.currentTarget.children,function(b){b.classList.toggle('on',b===e.target);}); if(teams.length) renderAll(); }});
+})();
+
 </script>
 </body>
 </html>
