@@ -1,9 +1,10 @@
 """
 Sultan Model - board builder (shared by the local builds and the hosted app).
 
-Given the historical spine + 2026 rosters + drafted rookies (+ optional analyst
-rankings), produce the full ranked board with redraft + dynasty fields, ready to
-embed in the UI. One source of truth so local == hosted.
+Given the historical spine + 2026 rosters + drafted rookies (+ any number of
+analyst ranking sources), produce the full ranked board with redraft + dynasty
+fields. Analysts roll into an Analyst Composite (unbiased avg across sources),
+which is what feeds MASTER -> Model + My + Analyst Composite.
 """
 
 import re
@@ -22,6 +23,65 @@ def norm(n):
     return re.sub(r"\s+", "", n)
 
 
+# ---------------------------------------------------------------------------
+# Analyst source parsers — each returns a long table [nk, position, rank]
+# ---------------------------------------------------------------------------
+def posrank_namepos(df, rank_col="Rank"):
+    """Standard format: columns Name, Position, Rank (positional rank)."""
+    d = df.rename(columns={"Position": "position"}).copy()
+    d["nk"] = d["Name"].map(norm)
+    d["rank"] = pd.to_numeric(d[rank_col], errors="coerce")
+    return d[["nk", "position", "rank"]].dropna()
+
+
+def posrank_fantasypros(df):
+    """FantasyPros export: a POS column like 'WR1' -> position WR, posrank 1."""
+    poscol = next((c for c in df.columns if c.strip().upper() in ("POS", "POSITION")), None)
+    namecol = next((c for c in df.columns if "PLAYER" in c.upper()
+                    or c.strip().lower() in ("name", "player")), None)
+    d = df.copy()
+    d["position"] = d[poscol].astype(str).str.extract(r"([A-Za-z]+)")[0].str.upper()
+    d["rank"] = pd.to_numeric(d[poscol].astype(str).str.extract(r"(\d+)")[0], errors="coerce")
+    d["nk"] = d[namecol].map(norm)
+    return d[["nk", "position", "rank"]].dropna()
+
+
+def dynasty_startup_sources(df):
+    """UDK Dynasty Startup with Andy/Jason/Mike -> one source per analyst."""
+    out = []
+    d = df.copy()
+    d["nk"] = d["Name"].map(norm)
+    d["position"] = d["Pos"] if "Pos" in d.columns else d.get("position")
+    for col in ["Andy", "Jason", "Mike"]:
+        if col in d.columns:
+            t = d[["nk", "position"]].copy()
+            t["val"] = pd.to_numeric(d[col], errors="coerce")
+            t["rank"] = t.groupby("position")["val"].rank(method="min")
+            out.append(t[["nk", "position", "rank"]].dropna())
+    return out
+
+
+def parse_generic(df):
+    """Auto-detect standard vs FantasyPros format."""
+    if {"Name", "Position", "Rank"}.issubset(df.columns):
+        return posrank_namepos(df)
+    return posrank_fantasypros(df)
+
+
+def _combine_sources(ranked, sources):
+    """Average positional rank across all sources per (nk, position)."""
+    if not sources:
+        return np.full(len(ranked), np.nan)
+    base = ranked[["nk", "position"]].copy()
+    cols = []
+    for i, s in enumerate(sources):
+        s2 = s.rename(columns={"rank": f"r{i}"}).dropna().drop_duplicates(["nk", "position"])
+        base = base.merge(s2[["nk", "position", f"r{i}"]], on=["nk", "position"], how="left")
+        cols.append(f"r{i}")
+    return base[cols].mean(axis=1).values
+
+
+# ---------------------------------------------------------------------------
 def _long_mult(pos, age):
     if pd.isna(age):
         age = 26
@@ -32,10 +92,17 @@ def _long_mult(pos, age):
     return float(np.clip(1 + (27 - age) * 0.04, 0.6, 1.4))  # TE
 
 
-def build_board(hist, rosters, rookies, udk_redraft=None, dyn_startup=None, season=2026):
-    """Returns a ranked DataFrame with redraft + dynasty fields.
-    udk_redraft: DataFrame[Name, Position, Rank] (analyst redraft positional rank).
-    dyn_startup: DataFrame[Name, Pos, Andy, Jason, Mike] (analyst dynasty ranks)."""
+def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=None,
+                season=2026, udk_redraft=None, dyn_startup=None):
+    """redraft_sources / dynasty_sources: lists of long-form [nk, position, rank]
+    tables (use the parsers above). udk_redraft / dyn_startup kept for back-compat."""
+    redraft_sources = list(redraft_sources or [])
+    dynasty_sources = list(dynasty_sources or [])
+    if udk_redraft is not None and len(udk_redraft):
+        redraft_sources.append(posrank_namepos(udk_redraft))
+    if dyn_startup is not None and len(dyn_startup):
+        dynasty_sources += dynasty_startup_sources(dyn_startup)
+
     rb = flex_prospect.rookie_base(rookies, hist) if rookies is not None and len(rookies) else None
     spine = flex_project.project(hist, rosters, method="scheme", rookie_base=rb)
     ranked = flex_score.score_season(spine, season, min_games=1)
@@ -43,37 +110,16 @@ def build_board(hist, rosters, rookies, udk_redraft=None, dyn_startup=None, seas
     extra_cols = [c for c in ["is_rookie", "prospect", "age"] if c in spine.columns]
     extra = spine[["player_display_name", "position", "recent_team"] + extra_cols].drop_duplicates()
     ranked = ranked.merge(extra, on=["player_display_name", "position", "recent_team"], how="left")
-    if "is_rookie" in ranked.columns:
-        ranked["is_rookie"] = ranked["is_rookie"].fillna(0).astype(int)
-    else:
-        ranked["is_rookie"] = 0
+    ranked["is_rookie"] = ranked.get("is_rookie", 0)
+    ranked["is_rookie"] = ranked["is_rookie"].fillna(0).astype(int)
     for c in ["prospect", "age"]:
         if c not in ranked.columns:
             ranked[c] = np.nan
     ranked["nk"] = ranked["player_display_name"].map(norm)
 
-    # analyst redraft positional rank
-    ranked["a_rd"] = np.nan
-    if udk_redraft is not None and len(udk_redraft):
-        u = udk_redraft.rename(columns={"Position": "position", "Rank": "a_rd"}).copy()
-        u["nk"] = u["Name"].map(norm)
-        u = u[["nk", "position", "a_rd"]].dropna().drop_duplicates(["nk", "position"])
-        ranked = ranked.drop(columns=["a_rd"]).merge(u, on=["nk", "position"], how="left")
-
-    # analyst dynasty composite -> positional rank
-    ranked["a_dyn"] = np.nan
-    if dyn_startup is not None and len(dyn_startup):
-        d = dyn_startup.copy()
-        for c in ["Andy", "Jason", "Mike"]:
-            if c in d.columns:
-                d[c] = pd.to_numeric(d[c], errors="coerce")
-        comp_cols = [c for c in ["Andy", "Jason", "Mike"] if c in d.columns]
-        d["composite"] = d[comp_cols].mean(axis=1)
-        d["nk"] = d["Name"].map(norm)
-        d["position"] = d["Pos"] if "Pos" in d.columns else d.get("position")
-        d["a_dyn"] = d.groupby("position")["composite"].rank(method="min")
-        dm = d[["nk", "position", "a_dyn"]].dropna().drop_duplicates(["nk", "position"])
-        ranked = ranked.drop(columns=["a_dyn"]).merge(dm, on=["nk", "position"], how="left")
+    # analyst composites (unbiased avg across all sources)
+    ranked["a_rd"] = _combine_sources(ranked, redraft_sources)
+    ranked["a_dyn"] = _combine_sources(ranked, dynasty_sources)
 
     # dynasty score (age-aware; rookies prospect-led)
     ranked["lf"] = ranked.apply(lambda r: _long_mult(r["position"], r["age"]), axis=1)
@@ -87,9 +133,8 @@ def build_board(hist, rosters, rookies, udk_redraft=None, dyn_startup=None, seas
 
 
 def board_records(ranked):
-    """List of dicts for the UI template."""
     def i_or_none(v):
-        return None if pd.isna(v) else int(v)
+        return None if pd.isna(v) else int(round(v))
 
     recs = []
     for _, r in ranked.iterrows():
