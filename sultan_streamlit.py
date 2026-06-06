@@ -121,28 +121,40 @@ def load_rookies():
 
 @st.cache_data(ttl=60 * 60 * 24)
 def load_analysts():
-    rd = glob.glob("analyst_data/UDK*Position*.csv") + glob.glob("analyst_data/*Position Rankings*.csv")
-    udk = None
-    if rd:
-        frames = []
-        for f in rd:
-            d = pd.read_csv(f)
-            if {"Name", "Position", "Rank"}.issubset(d.columns):
-                frames.append(d[["Name", "Position", "Rank"]])
-        if frames:
-            udk = pd.concat(frames, ignore_index=True)
-    dyn = None
-    dl = glob.glob("analyst_data/*Dynasty Startup*.csv")
-    if dl:
-        dyn = pd.read_csv(dl[0])
-    return udk, dyn
+    """Build redraft + dynasty analyst SOURCE lists from analyst_data/.
+    Drop in any number of CSVs; each becomes one voice in the Analyst Composite.
+      - UDK position files (Name/Position/Rank)         -> one redraft source
+      - Dynasty Startup (Andy/Jason/Mike)               -> 3 dynasty sources
+      - redraft_*.csv / dynasty_*.csv  (standard OR FantasyPros export) -> one each
+    """
+    redraft, dynasty = [], []
+    udk = []
+    for f in glob.glob("analyst_data/UDK*Position*.csv") + glob.glob("analyst_data/*Position Rankings*.csv"):
+        d = pd.read_csv(f)
+        if {"Name", "Position", "Rank"}.issubset(d.columns):
+            udk.append(d[["Name", "Position", "Rank"]])
+    if udk:
+        redraft.append(flex_board.posrank_namepos(pd.concat(udk, ignore_index=True)))
+    for f in glob.glob("analyst_data/*Dynasty Startup*.csv"):
+        dynasty += flex_board.dynasty_startup_sources(pd.read_csv(f))
+    for f in glob.glob("analyst_data/redraft_*.csv"):
+        try:
+            redraft.append(flex_board.parse_generic(pd.read_csv(f)))
+        except Exception as e:
+            st.info(f"Could not parse {f}: {e}")
+    for f in glob.glob("analyst_data/dynasty_*.csv"):
+        try:
+            dynasty.append(flex_board.parse_generic(pd.read_csv(f)))
+        except Exception as e:
+            st.info(f"Could not parse {f}: {e}")
+    return redraft, dynasty
 
 
 @st.cache_data(ttl=60 * 60 * 6, show_spinner="Building the board…")
 def build():
-    udk, dyn = load_analysts()
+    redraft_sources, dynasty_sources = load_analysts()
     board = flex_board.build_board(load_history(), load_rosters_2026(), load_rookies(),
-                                   udk_redraft=udk, dyn_startup=dyn)
+                                   redraft_sources=redraft_sources, dynasty_sources=dynasty_sources)
     return flex_board.board_records(board)
 
 
