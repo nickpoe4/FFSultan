@@ -14,6 +14,7 @@ import pandas as pd
 import flex_project
 import flex_score
 import flex_prospect
+import flex_qb
 
 
 def norm(n):
@@ -89,11 +90,13 @@ def _long_mult(pos, age):
         return float(np.clip(1 + (24 - age) * 0.07, 0.5, 1.5))
     if pos == "WR":
         return float(np.clip(1 + (26 - age) * 0.05, 0.6, 1.5))
+    if pos == "QB":
+        return float(np.clip(1 + (29 - age) * 0.03, 0.7, 1.3))   # QBs age well
     return float(np.clip(1 + (27 - age) * 0.04, 0.6, 1.4))  # TE
 
 
 def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=None,
-                season=2026, udk_redraft=None, dyn_startup=None):
+                season=2026, udk_redraft=None, dyn_startup=None, qb_hist=None, pass_td=4):
     """redraft_sources / dynasty_sources: lists of long-form [nk, position, rank]
     tables (use the parsers above). udk_redraft / dyn_startup kept for back-compat."""
     redraft_sources = list(redraft_sources or [])
@@ -115,6 +118,16 @@ def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=No
     for c in ["prospect", "age"]:
         if c not in ranked.columns:
             ranked[c] = np.nan
+
+    # QB track (superflex): project + fold QBs into the same board
+    if qb_hist is not None and len(qb_hist):
+        qrows = flex_qb.project_qb(qb_hist, rosters, hist, pass_td=pass_td, season=season)
+        ranked = pd.concat([ranked, qrows], ignore_index=True, sort=False)
+        ranked["is_rookie"] = ranked["is_rookie"].fillna(0).astype(int)
+        for c in ["prospect", "age"]:
+            if c not in ranked.columns:
+                ranked[c] = np.nan
+
     ranked["nk"] = ranked["player_display_name"].map(norm)
 
     # analyst composites (unbiased avg across all sources)
@@ -154,7 +167,9 @@ def board_records(ranked):
             "opportunity": round(float(r["opportunity"]), 1), "efficiency": round(float(r["efficiency"]), 1),
             "context": round(float(r["context"]), 1),
             "ppg_ppr": round(float(r["ppg_ppr"]), 1), "ppg_half": round(float(r["ppg_half"]), 1),
-            "tgt_share_season": round(float(r["tgt_share_season"]), 3), "rush_share": round(float(r["rush_share"]), 3),
-            "wopr": round(float(r["wopr"]), 3), "total_tds": round(float(r["total_tds"]), 1),
+            "tgt_share_season": (None if pd.isna(r["tgt_share_season"]) else round(float(r["tgt_share_season"]), 3)),
+            "rush_share": (None if pd.isna(r["rush_share"]) else round(float(r["rush_share"]), 3)),
+            "wopr": (None if pd.isna(r["wopr"]) else round(float(r["wopr"]), 3)),
+            "total_tds": round(float(r["total_tds"]), 1),
         })
     return recs

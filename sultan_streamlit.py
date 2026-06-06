@@ -22,6 +22,7 @@ import nflreadpy as nfl
 
 import flex_spine
 import flex_board
+import flex_qb
 
 SEASONS = [2023, 2024, 2025]
 st.set_page_config(page_title="Sultan — Fantasy Football Model", layout="wide")
@@ -169,6 +170,11 @@ def load_fantasypros():
         return None, None
 
 
+@st.cache_data(ttl=60 * 60 * 12, show_spinner="Building QB projections…")
+def load_qb():
+    return flex_qb.build_qb_spine(flex_spine.load_weekly(nfl, SEASONS))
+
+
 @st.cache_data(ttl=60 * 60 * 6, show_spinner="Building the board…")
 def build():
     redraft_sources, dynasty_sources = load_analysts()
@@ -178,7 +184,8 @@ def build():
     if fp_dy is not None and len(fp_dy):
         dynasty_sources.append(fp_dy)
     board = flex_board.build_board(load_history(), load_rosters_2026(), load_rookies(),
-                                   redraft_sources=redraft_sources, dynasty_sources=dynasty_sources)
+                                   redraft_sources=redraft_sources, dynasty_sources=dynasty_sources,
+                                   qb_hist=load_qb(), pass_td=4)
     return flex_board.board_records(board)
 
 

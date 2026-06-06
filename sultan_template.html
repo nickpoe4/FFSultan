@@ -35,7 +35,7 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
 .rk{color:var(--muted2);font-family:var(--num);}
 .nm{font-weight:700;color:#fff;}
 .pos{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px;color:#0a0420;}
-.pos.RB{background:#37e0a0;}.pos.WR{background:var(--cyan);}.pos.TE{background:var(--gold);}
+.pos.QB{background:#b07be0;}.pos.RB{background:#37e0a0;}.pos.WR{background:var(--cyan);}.pos.TE{background:var(--gold);}
 .ov{font-family:var(--num);font-weight:700;color:var(--cyan);text-shadow:0 0 6px rgba(45,226,230,.55);}
 .gr{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;}
 .barcell{min-width:74px;}
@@ -88,7 +88,7 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
 .tcard .mine{color:var(--gold);font-weight:700;}
 .tcard .weak{color:#ff7a7a;}.tcard .strong{color:#37e0a0;}
 .tcard .pill{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#0a0420;}
-.tcard .pill.RB{background:#37e0a0;}.tcard .pill.WR{background:var(--cyan);}.tcard .pill.TE{background:var(--gold);}
+.tcard .pill.QB{background:#b07be0;}.tcard .pill.RB{background:#37e0a0;}.tcard .pill.WR{background:var(--cyan);}.tcard .pill.TE{background:var(--gold);}
 .tradebox{display:flex;gap:18px;flex-wrap:wrap;}.tradecol{flex:1;min-width:260px;}
 .chk{font-size:13px;padding:3px 0;display:flex;justify-content:space-between;gap:8px;}
 
@@ -129,7 +129,7 @@ tr.prow:hover{background:rgba(255,79,163,.09);cursor:pointer;}
     <div class="controls">
     <div class="seg" id="mode"><button data-m="redraft" class="on">Redraft</button><button data-m="dynasty">Dynasty</button></div>
     <div class="seg" id="fmt"><button data-f="ppr" class="on">PPR</button><button data-f="half">Half&nbsp;PPR</button></div>
-    <div class="seg" id="pos"><button data-p="ALL" class="on">All</button><button data-p="RB">RB</button><button data-p="WR">WR</button><button data-p="TE">TE</button></div>
+    <div class="seg" id="pos"><button data-p="ALL" class="on">All</button><button data-p="QB">QB</button><button data-p="RB">RB</button><button data-p="WR">WR</button><button data-p="TE">TE</button></div>
     <input type="search" id="q" placeholder="Search player…"/>
     <div class="seg"><button id="resetmr">Reset my ranks</button></div>
   </div>
@@ -334,15 +334,15 @@ document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) 
     });
   }
   function teamValue(t){ return t.recs.reduce(function(a,r){return a+val(r);},0); }
-  function posBreak(t){ var o={RB:0,WR:0,TE:0}; t.recs.forEach(function(r){o[r.pos]=(o[r.pos]||0)+val(r);}); return o; }
+  function posBreak(t){ var o={QB:0,RB:0,WR:0,TE:0}; t.recs.forEach(function(r){o[r.pos]=(o[r.pos]||0)+val(r);}); return o; }
   function show(id){ $(id).style.display=''; }
   function fmtLbl(){ return mode==='dynasty'?'Dynasty':fmt.toUpperCase(); }
   function renderAll(){ renderRankings(); renderMyTeam(); renderFix(); renderTrade(); }
   function renderRankings(){
     var ts=teams.slice().sort(function(a,b){return teamValue(b)-teamValue(a);});
-    var html='<h2>League power rankings</h2><table><thead><tr><th>#</th><th>Team</th><th class="num">Total</th><th class="num">RB</th><th class="num">WR</th><th class="num">TE</th></tr></thead><tbody>';
+    var html='<h2>League power rankings</h2><table><thead><tr><th>#</th><th>Team</th><th class="num">Total</th><th class="num">QB</th><th class="num">RB</th><th class="num">WR</th><th class="num">TE</th></tr></thead><tbody>';
     ts.forEach(function(t,i){ var pb=posBreak(t);
-      html+='<tr class="'+(t.isMine?'mine':'')+'"><td>'+(i+1)+'</td><td>'+t.name+(t.isMine?' ★':'')+'</td><td class="num val">'+teamValue(t).toFixed(0)+'</td><td class="num">'+pb.RB.toFixed(0)+'</td><td class="num">'+pb.WR.toFixed(0)+'</td><td class="num">'+pb.TE.toFixed(0)+'</td></tr>';
+      html+='<tr class="'+(t.isMine?'mine':'')+'"><td>'+(i+1)+'</td><td>'+t.name+(t.isMine?' ★':'')+'</td><td class="num val">'+teamValue(t).toFixed(0)+'</td><td class="num">'+pb.QB.toFixed(0)+'</td><td class="num">'+pb.RB.toFixed(0)+'</td><td class="num">'+pb.WR.toFixed(0)+'</td><td class="num">'+pb.TE.toFixed(0)+'</td></tr>';
     });
     html+='</tbody></table><small>Total = sum of rostered RB/WR/TE '+fmtLbl()+' Overall. QBs not modeled yet.</small>';
     $('tt_rankings').innerHTML=html; show('tt_rankings');
@@ -355,11 +355,11 @@ document.getElementById('viewnav').onclick=function(e){ if(!e.target.dataset.v) 
     recs.forEach(function(r){ html+='<tr><td>'+r.name+(r.is_rookie?' <span class="rook">R</span>':'')+'</td><td><span class="pill '+r.pos+'">'+r.pos+'</span></td><td>'+r.team+'</td><td class="num val">'+val(r).toFixed(1)+'</td></tr>'; });
     html+='</tbody></table>'; $('tt_myteam').innerHTML=html; show('tt_myteam');
   }
-  function leagueAvgPos(){ var tot={RB:0,WR:0,TE:0}; teams.forEach(function(t){var pb=posBreak(t);tot.RB+=pb.RB;tot.WR+=pb.WR;tot.TE+=pb.TE;}); var n=teams.length||1; return {RB:tot.RB/n,WR:tot.WR/n,TE:tot.TE/n}; }
+  function leagueAvgPos(){ var tot={QB:0,RB:0,WR:0,TE:0}; teams.forEach(function(t){var pb=posBreak(t);tot.QB+=pb.QB;tot.RB+=pb.RB;tot.WR+=pb.WR;tot.TE+=pb.TE;}); var n=teams.length||1; return {QB:tot.QB/n,RB:tot.RB/n,WR:tot.WR/n,TE:tot.TE/n}; }
   function renderFix(){
     var t=teams.filter(function(x){return x.isMine;})[0]; if(!t){ $('tt_fix').style.display='none'; return; }
     var mine=posBreak(t), avg=leagueAvgPos();
-    var diffs=['RB','WR','TE'].map(function(p){return {p:p,d:mine[p]-avg[p]};}).sort(function(a,b){return a.d-b.d;});
+    var diffs=['QB','RB','WR','TE'].map(function(p){return {p:p,d:mine[p]-avg[p]};}).sort(function(a,b){return a.d-b.d;});
     var html='<h2>Fix your team</h2><table><thead><tr><th>Pos</th><th class="num">You</th><th class="num">Lg avg</th><th class="num">Diff</th></tr></thead><tbody>';
     diffs.forEach(function(x){ var cls=x.d<0?'weak':'strong'; html+='<tr><td>'+x.p+'</td><td class="num">'+mine[x.p].toFixed(0)+'</td><td class="num">'+avg[x.p].toFixed(0)+'</td><td class="num '+cls+'">'+(x.d>=0?'+':'')+x.d.toFixed(0)+'</td></tr>'; });
     html+='</tbody></table>';
