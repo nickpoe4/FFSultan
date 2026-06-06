@@ -150,9 +150,32 @@ def load_analysts():
     return redraft, dynasty
 
 
+@st.cache_data(ttl=60 * 60 * 6, show_spinner="Fetching FantasyPros consensus…")
+def load_fantasypros():
+    """Live FantasyPros ECR if a key is set in Streamlit secrets (FANTASYPROS_API_KEY)."""
+    try:
+        key = st.secrets["FANTASYPROS_API_KEY"]
+    except Exception:
+        key = None
+    if not key:
+        return None, None
+    try:
+        import flex_fantasypros as fp
+        return (fp.fetch(key, year=2026, kind="draft", scoring="PPR"),
+                fp.fetch(key, year=2026, kind="dynasty", scoring="PPR"))
+    except Exception as e:
+        st.info(f"FantasyPros fetch skipped ({e}). Using CSV/UDK analysts only.")
+        return None, None
+
+
 @st.cache_data(ttl=60 * 60 * 6, show_spinner="Building the board…")
 def build():
     redraft_sources, dynasty_sources = load_analysts()
+    fp_rd, fp_dy = load_fantasypros()
+    if fp_rd is not None and len(fp_rd):
+        redraft_sources.append(fp_rd)
+    if fp_dy is not None and len(fp_dy):
+        dynasty_sources.append(fp_dy)
     board = flex_board.build_board(load_history(), load_rosters_2026(), load_rookies(),
                                    redraft_sources=redraft_sources, dynasty_sources=dynasty_sources)
     return flex_board.board_records(board)

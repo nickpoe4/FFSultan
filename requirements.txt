@@ -3,3 +3,4 @@ nflreadpy
 pandas
 numpy
 pyarrow
+requests
