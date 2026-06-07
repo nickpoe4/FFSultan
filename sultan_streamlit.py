@@ -189,13 +189,39 @@ def build():
     return flex_board.board_records(board)
 
 
+def _adp_norm(s):
+    s = "".join(ch for ch in str(s).lower() if ch.isalpha() or ch == " ")
+    return "".join(w for w in s.split() if w not in ("jr", "sr", "ii", "iii", "iv", "v"))
+
+
+@st.cache_data(ttl=60 * 60 * 24)
+def load_adp(path="adp_2026.csv"):
+    if not pathlib.Path(path).exists():
+        return {}
+    d = pd.read_csv(path)
+
+    def f(v):
+        return None if (pd.isna(v) or v == "") else float(v)
+    return {_adp_norm(row["name"]): {"ppr": f(row.get("adp_ppr")), "half": f(row.get("adp_half"))}
+            for _, row in d.iterrows()}
+
+
+def attach_adp(records):
+    adp = load_adp()
+    for r in records:
+        a = adp.get(_adp_norm(r["name"])) or {}
+        r["adp_ppr"] = a.get("ppr")
+        r["adp_half"] = a.get("half")
+    return records
+
+
 c1, c2 = st.columns([4, 1])
 c1.markdown("#### Sultan — 2026 (Redraft + Dynasty)")
 if c2.button("↻ Refresh data"):
     st.cache_data.clear()
     st.rerun()
 
-records = build()
+records = attach_adp(build())
 template = pathlib.Path("sultan_template.html").read_text()
 html = template.replace("__DATA__", json.dumps(records, separators=(",", ":")))
 components.html(html, height=940, scrolling=True)
