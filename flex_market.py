@@ -4,22 +4,31 @@ Sultan — ADP + market analysis (Undervalued / Overvalued / Breakouts).
 Single source of truth shared by the offline builder (build_sultan90.py) and the
 hosted app (sultan_streamlit.py):
 
-  - Hosted app     -> get_adp() fetches LIVE ADP from the Fantasy Football
-                      Calculator public JSON API (no key, server-side, cached
-                      weekly by the app) and falls back to the committed CSV.
+  - Hosted app     -> get_adp() fetches LIVE 2026 ADP from FantasyPros (cached
+                      weekly) and falls back to the committed CSV snapshot.
   - Offline build  -> load_adp_csv() reads the committed adp_2026.csv snapshot
-                      (the sandbox can't reach the API, so the openable file is a
-                      snapshot; the hosted app is the live one).
+                      (the sandbox can't reach the web, so the openable file is a
+                      snapshot; the hosted app is the live, self-updating one).
 
-Fantasy Football Calculator returns clean JSON for both PPR and Half-PPR, so a
-plain requests.get works — no key, no browser, no HTML scraping.
+FantasyPros' ADP "overall" pages are SERVER-rendered for 2026 — the player rows
+(fp-player-name="..." + an AVG/ADP column) are in the raw HTML, so a plain
+requests.get + regex parse works with no key and no browser. The ?year context
+is 2026 because we hit the 2026 ADP pages directly.
+
+(Note: Fantasy Football Calculator's API was rejected as a source — its
+year=2026 endpoint still returns September-2025-dated drafts, i.e. last season's
+numbers, until real 2026 drafts accumulate. FantasyPros is genuine 2026 now.)
 """
 
 import os
+import re
 import pandas as pd
 
-FFC_PATHS = {"ppr": "ppr", "half": "half-ppr"}
-FFC_URL = "https://fantasyfootballcalculator.com/api/v1/adp/{path}?teams={teams}&year={year}"
+# 2026 ADP pages (server-rendered; the rows live in the raw HTML).
+ADP_PAGES = {
+    "ppr": "https://www.fantasypros.com/nfl/adp/ppr-overall.php",
+    "half": "https://www.fantasypros.com/nfl/adp/half-point-ppr-overall.php",
+}
 _UA = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")}
 
@@ -34,20 +43,32 @@ def _fmt_adp(a):
 
 
 # ---------------------------------------------------------------- ADP sources
-def fetch_adp_live(year=2026, teams=12, timeout=15):
-    """{'ppr': {norm:adp}, 'half': {norm:adp}} from Fantasy Football Calculator.
-    Raises on failure so get_adp() can fall back to the snapshot."""
+def parse_adp_html(html):
+    """{norm_name: adp} from a FantasyPros 2026 ADP overall page (the AVG column,
+    which is the last <td> in each player row)."""
+    out = {}
+    for row in html.split("<tr")[1:]:
+        nm = re.search(r'fp-player-name="([^"]+)"', row)
+        if not nm:
+            continue
+        tds = re.findall(r"<td[^>]*>([\s\S]*?)</td>", row)
+        if not tds:
+            continue
+        try:
+            out[norm(nm.group(1))] = float(re.sub(r"<[^>]+>", "", tds[-1]).strip())
+        except ValueError:
+            continue
+    return out
+
+
+def fetch_adp_live(timeout=20):
+    """{'ppr': {...}, 'half': {...}} from FantasyPros' 2026 pages. Raises on
+    failure so get_adp() can fall back to the committed snapshot."""
     import requests
     res = {}
-    for kind, path in FFC_PATHS.items():
-        url = FFC_URL.format(path=path, teams=teams, year=year)
-        j = requests.get(url, headers=_UA, timeout=timeout).json()
-        d = {}
-        for p in (j.get("players") or []):
-            n = norm(p.get("name", ""))
-            a = p.get("adp")
-            if n and a is not None:
-                d[n] = float(a)
+    for kind, url in ADP_PAGES.items():
+        html = requests.get(url, headers=_UA, timeout=timeout).text
+        d = parse_adp_html(html)
         if len(d) < 50:
             raise RuntimeError("ADP parse looks wrong for %s (got %d rows)" % (kind, len(d)))
         res[kind] = d
@@ -68,14 +89,14 @@ def load_adp_csv(path="adp_2026.csv"):
 
 
 def get_adp(csv_path="adp_2026.csv", live=True):
-    """Live Fantasy Football Calculator ADP if available, else the committed CSV.
+    """Live FantasyPros 2026 ADP if reachable, else the committed CSV snapshot.
     Returns ({'ppr':..,'half':..}, source_label)."""
     if live:
         try:
-            return fetch_adp_live(), "Fantasy Football Calculator (live)"
+            return fetch_adp_live(), "FantasyPros 2026 (live)"
         except Exception as e:
             print("ADP live fetch failed (%s); using committed snapshot." % e)
-    return load_adp_csv(csv_path), "committed snapshot"
+    return load_adp_csv(csv_path), "committed 2026 snapshot"
 
 
 def attach_adp(records, adp):
