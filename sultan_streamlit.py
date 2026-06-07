@@ -23,6 +23,7 @@ import nflreadpy as nfl
 import flex_spine
 import flex_board
 import flex_qb
+import flex_market
 
 SEASONS = [2023, 2024, 2025]
 st.set_page_config(page_title="Sultan — Fantasy Football Model", layout="wide")
@@ -189,30 +190,10 @@ def build():
     return flex_board.board_records(board)
 
 
-def _adp_norm(s):
-    s = "".join(ch for ch in str(s).lower() if ch.isalpha() or ch == " ")
-    return "".join(w for w in s.split() if w not in ("jr", "sr", "ii", "iii", "iv", "v"))
-
-
-@st.cache_data(ttl=60 * 60 * 24)
-def load_adp(path="adp_2026.csv"):
-    if not pathlib.Path(path).exists():
-        return {}
-    d = pd.read_csv(path)
-
-    def f(v):
-        return None if (pd.isna(v) or v == "") else float(v)
-    return {_adp_norm(row["name"]): {"ppr": f(row.get("adp_ppr")), "half": f(row.get("adp_half"))}
-            for _, row in d.iterrows()}
-
-
-def attach_adp(records):
-    adp = load_adp()
-    for r in records:
-        a = adp.get(_adp_norm(r["name"])) or {}
-        r["adp_ppr"] = a.get("ppr")
-        r["adp_half"] = a.get("half")
-    return records
+@st.cache_data(ttl=60 * 60 * 24 * 7, show_spinner="Refreshing ADP…")
+def adp_weekly():
+    """Live FantasyPros ADP, refreshed at most weekly; CSV snapshot fallback."""
+    return flex_market.get_adp("adp_2026.csv", live=True)
 
 
 c1, c2 = st.columns([4, 1])
@@ -221,7 +202,11 @@ if c2.button("↻ Refresh data"):
     st.cache_data.clear()
     st.rerun()
 
-records = attach_adp(build())
+adp, adp_src = adp_weekly()
+records = flex_market.attach_adp(build(), adp)
+market = flex_market.both_markets(records)
 template = pathlib.Path("sultan_template.html").read_text()
-html = template.replace("__DATA__", json.dumps(records, separators=(",", ":")))
+html = (template.replace("__DATA__", json.dumps(records, separators=(",", ":")))
+                .replace("__MARKET__", json.dumps(market, separators=(",", ":"))))
 components.html(html, height=940, scrolling=True)
+st.caption("ADP: %s · auto-refreshes weekly (hit ↻ Refresh data to update now)." % adp_src)
