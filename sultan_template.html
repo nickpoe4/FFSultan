@@ -45,9 +45,9 @@ tr.pr:hover td{background:#fff7df;cursor:pointer;}
 .bar>i{display:block;height:100%;background:repeating-linear-gradient(90deg,var(--pink) 0 7px,var(--orange) 7px 14px,var(--yellow) 14px 21px);}
 .mvbtn{font-family:'Bowlby One SC';border:2px solid var(--ink);background:var(--cream);border-radius:6px;cursor:pointer;font-size:11px;padding:0 5px;margin:0 1px;}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
-#scrim{position:fixed;inset:0;background:rgba(21,18,31,.55);display:none;z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-#scrim.on{display:block;}
-.scrimwrap{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:18px 0 28px;box-sizing:border-box;}
+#scrim{display:none;}
+#scrim.on{display:block;min-height:100vh;}
+.scrimwrap{display:flex;align-items:flex-start;justify-content:center;padding:14px 0 52px;box-sizing:border-box;}
 #card{background:var(--cream);border:4px solid var(--ink);border-radius:18px;box-shadow:10px 10px 0 var(--ink);max-width:440px;width:92%;}
 #card.wide{max-width:880px;width:96%;}
 .chd{background:var(--teal);border-bottom:4px solid var(--ink);padding:14px 16px;display:flex;align-items:center;gap:12px;}
@@ -378,7 +378,7 @@ function openTeam(tm){
     +'</div></div>';
   var c=document.getElementById('card'); c.className='wide'; c.innerHTML=html;
   document.getElementById('scrim').classList.add('on');
-  document.getElementById('scrim').scrollTop=0;
+  _showScrim();
 }
 /* ---- market: Undervalued / Overvalued / Breakouts (editable) ---- */
 function mktEsc(s){return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -525,7 +525,7 @@ function openRookie(i){
   html+='</div>';
   var card=document.getElementById('card'); card.className='wide'; card.innerHTML=html;
   document.getElementById('scrim').classList.add('on');
-  document.getElementById('scrim').scrollTop=0;
+  _showScrim();
 }
 
 /* ---- college scouting ---- */
@@ -564,7 +564,7 @@ function openProspect(i){
     +'<div style="border-top:3px solid var(--ink);margin-top:11px;padding-top:9px"><div style="font-weight:800;font-size:12px;color:var(--purple);margin-bottom:5px">THE SCOUTING REPORT</div><p style="font-size:13.5px;line-height:1.62;margin:0">'+(p.writeup||p.note||'')+'</p></div></div>';
   var c=document.getElementById('card'); c.className=''; c.innerHTML=html;
   document.getElementById('scrim').classList.add('on');
-  document.getElementById('scrim').scrollTop=0;
+  _showScrim();
 }
 
 /* ---- player card ---- */
@@ -650,7 +650,7 @@ function openCard(name, ev){
   html+='</div>';
   var card=document.getElementById('card'); card.className='wide'; card.innerHTML=html;
   document.getElementById('scrim').classList.add('on');
-  document.getElementById('scrim').scrollTop=0;
+  _showScrim();
 }
 function openCardBasic(p){
   var ov=val(p), gr=grade(p);
@@ -671,9 +671,20 @@ function openCardBasic(p){
     +'</div></div>';
   var card=document.getElementById('card'); card.className=''; card.innerHTML=html;
   var scrim=document.getElementById('scrim'); scrim.classList.add('on');
-  document.getElementById('scrim').scrollTop=0;
+  _showScrim();
 }
-function closeCard(){document.getElementById('scrim').classList.remove('on');}
+function _showScrim(){
+  var w=document.querySelector('.wrap'); if(w)w.style.display='none';
+  var h=document.querySelector('header'); if(h)h.style.display='none';
+  document.getElementById('scrim').classList.add('on');
+  try{window.scrollTo(0,0);}catch(e){}
+}
+function closeCard(){
+  document.getElementById('scrim').classList.remove('on');
+  var w=document.querySelector('.wrap'); if(w)w.style.display='';
+  var h=document.querySelector('header'); if(h)h.style.display='';
+  try{window.scrollTo(0,0);}catch(e){}
+}
 
 /* ---- events ---- */
 function segHandler(id,setFn){document.getElementById(id).addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;setFn(b);[].forEach.call(e.currentTarget.children,function(x){x.classList.toggle('on',x===b);});renderSection();});}
