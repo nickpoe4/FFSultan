@@ -46,6 +46,16 @@ tr.pr:hover td{background:#fff7df;cursor:pointer;}
 .bar{height:11px;border:2px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden;min-width:64px;}
 .bar>i{display:block;height:100%;background:repeating-linear-gradient(90deg,var(--pink) 0 7px,var(--orange) 7px 14px,var(--yellow) 14px 21px);}
 .mvbtn{font-family:'Bowlby One SC';border:2px solid var(--ink);background:var(--cream);border-radius:6px;cursor:pointer;font-size:11px;padding:0 5px;margin:0 1px;}
+.tiertoolbar{display:flex;align-items:center;gap:8px;margin:6px 0 10px;flex-wrap:wrap;}
+.tierctl{font-family:'Bowlby One SC';border:2px solid var(--ink);background:var(--yellow);color:var(--ink);border-radius:8px;cursor:pointer;font-size:12px;padding:6px 10px;box-shadow:2px 2px 0 var(--ink);}
+.tierctl[data-tieract="clear"]{background:var(--pink);color:#fff;}
+.tierctl:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink);}
+.tiertip{font-size:11px;opacity:.7;}
+.tierbtn{font-family:'Bowlby One SC';border:2px solid var(--ink);background:var(--cream);color:var(--ink);border-radius:6px;cursor:pointer;font-size:11px;padding:0 5px;margin:0 1px;}
+.tierbtn.on{background:var(--teal);color:#fff;}
+tr.tierhdr td{background:linear-gradient(90deg,var(--teal),var(--pink));color:#fff;font-family:'Bowlby One SC';font-size:13px;letter-spacing:.5px;padding:5px 10px;border:2px solid var(--ink);text-shadow:1px 1px 0 rgba(0,0,0,.35);}
+tr.tband0 td:first-child{box-shadow:inset 4px 0 0 var(--teal);}
+tr.tband1 td:first-child{box-shadow:inset 4px 0 0 var(--pink);}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
 #scrim{display:none;}
 #scrim.on{display:block;min-height:100vh;}
@@ -296,8 +306,8 @@ function renderRankings(){
     rows=rows.slice().sort(function(a,b){return mi[key(a)]-mi[key(b)];});
     window._myVisible=rows.map(key);
     note='Drag the ≡ handle or use ▲▼ to set your board. Numbers update live and save automatically. Seeded from the Analyst composite.';
-    var h='<table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
-    rows.forEach(function(r,i){var k=encodeURIComponent(key(r));h+='<tr class="myrow" draggable="true" data-k="'+k+'"><td class="rk">'+(i+1)+'</td><td><span class="drag">≡</span><button class="mvbtn" data-mv="-1" data-k="'+k+'">▲</button><button class="mvbtn" data-mv="1" data-k="'+k+'">▼</button></td><td class="pr" data-k="'+k+'">'+rowFace(r)+'</td><td>'+teamCell(r)+'</td><td class="r">'+ppg(r).toFixed(1)+'</td><td class="r adp">'+adpStr(r)+'</td></tr>';});
+    var TM=tierMap();var TB=getTiers();var _lt=0;var h='<div class="tiertoolbar"><button class="tierctl" data-tieract="auto">&#10022; Auto-tier</button><button class="tierctl" data-tieract="clear">&#10005; Clear tiers</button><span class="tiertip">Tap &#9644; on any row to start a new tier there.</span></div><table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
+    rows.forEach(function(r,i){var k=encodeURIComponent(key(r));var kk=key(r);var tn=TM[kk]||1;if(tn!==_lt){_lt=tn;h+='<tr class="tierhdr"><td colspan="6">Tier '+tn+'</td></tr>';}var _on=TB.indexOf(kk)>=0?' on':'';h+='<tr class="myrow tband'+(tn%2)+'" draggable="true" data-k="'+k+'"><td class="rk">'+(i+1)+'</td><td><span class="drag">≡</span><button class="mvbtn" data-mv="-1" data-k="'+k+'">▲</button><button class="mvbtn" data-mv="1" data-k="'+k+'">▼</button><button class="tierbtn'+_on+'" data-k="'+k+'" title="Start a new tier here">&#9644;</button></td><td class="pr" data-k="'+k+'">'+rowFace(r)+'</td><td>'+teamCell(r)+'</td><td class="r">'+ppg(r).toFixed(1)+'</td><td class="r adp">'+adpStr(r)+'</td></tr>';});
     document.getElementById('rk-list').innerHTML=h+'</tbody></table>';
   }
   document.getElementById('rk-note').textContent=note;
@@ -305,6 +315,13 @@ function renderRankings(){
 
 function applyVisibleOrder(visKeys){var g=getMyOrder();var set={};visKeys.forEach(function(k){set[k]=1;});var vi=0;var ng=g.map(function(k){return set[k]?visKeys[vi++]:k;});saveMyOrder(ng);}
 function moveKey(k,dir){var vis=window._myVisible.slice();var i=vis.indexOf(k);if(i<0)return;var j=i+dir;if(j<0||j>=vis.length)return;var t=vis[i];vis[i]=vis[j];vis[j]=t;applyVisibleOrder(vis);renderRankings();}
+function tkey(){return 'sultan90_tiers_'+mode+'_'+fmt;}
+function getTiers(){var s=localStorage.getItem(tkey());if(s){try{return JSON.parse(s)||[];}catch(e){}}return [];}
+function saveTiers(a){localStorage.setItem(tkey(),JSON.stringify(a));}
+function toggleTier(k){var a=getTiers();var i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);saveTiers(a);}
+function clearTiers(){saveTiers([]);}
+function tierMap(){var o=getMyOrder();var set={};getTiers().forEach(function(k){set[k]=1;});var m={},t=1;o.forEach(function(k,i){if(i>0&&set[k])t++;m[k]=t;});return m;}
+function autoTier(){var o=getMyOrder();var byk={};DATA.forEach(function(r){byk[key(r)]=r;});var vals=o.map(function(k){var r=byk[k];return r?val(r):null;});var gaps=[];for(var i=1;i<vals.length;i++){if(vals[i]!=null&&vals[i-1]!=null)gaps.push(vals[i-1]-vals[i]);}if(!gaps.length){saveTiers([]);return;}var sorted=gaps.slice().sort(function(a,b){return a-b;});var thr=sorted[Math.floor(sorted.length*0.85)];var rng=(vals[0]-vals[vals.length-1])||1;var floor=rng*0.03;if(thr<floor)thr=floor;var breaks=[];for(var j=1;j<o.length;j++){if(vals[j]!=null&&vals[j-1]!=null&&(vals[j-1]-vals[j])>=thr)breaks.push(o[j]);}if(breaks.length>14)breaks=breaks.slice(0,14);saveTiers(breaks);}
 
 function renderMaster(){
   var mi=myIndexMap();
@@ -725,6 +742,8 @@ document.querySelector('.wrap').addEventListener('click',function(e){
   var tb=e.target.closest('.teambtn'); if(tb){openTeam(tb.dataset.team);return;}
   var cp=e.target.closest('.cprow'); if(cp){openProspect(parseInt(cp.dataset.i,10));return;}
   var rr=e.target.closest('.rkrow'); if(rr){openRookie(parseInt(rr.dataset.i,10));return;}
+  var tctl=e.target.closest('.tierctl'); if(tctl){if(tctl.dataset.tieract==='auto')autoTier();else clearTiers();renderRankings();return;}
+  var tbt=e.target.closest('.tierbtn'); if(tbt){toggleTier(decodeURIComponent(tbt.dataset.k));renderRankings();return;}
   var mv=e.target.closest('.mvbtn'); if(mv){moveKey(decodeURIComponent(mv.dataset.k),parseInt(mv.dataset.mv,10));return;}
   var pr=e.target.closest('.pr'); if(pr){openCard(decodeURIComponent(pr.dataset.k).split('|')[0], e);}
 });
