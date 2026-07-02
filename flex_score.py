@@ -2,24 +2,28 @@
 FLEX Model - Phase 2: the scoring engine.
 
 Turns the Phase-1 data spine into a player PROFILE:
-  - Opportunity grade   (0-100)
-  - Efficiency grade    (0-100)
-  - Context grade       (0-100)
-  - Overall FLEX score  (weighted blend, per position)
+- Opportunity grade (0-100)
+- Efficiency grade (0-100)
+- Context grade (0-100)
+- Overall FLEX score (weighted blend, per position)
 
 HOW GRADES ARE BUILT
-  Each grade is the average PERCENTILE of its component metrics, computed
-  WITHIN a position-season group (so a WR is graded against other WRs that
-  year, not against RBs). 0 = worst in class, 100 = best in class.
-
+Each grade is the average PERCENTILE of its component metrics, computed
+WITHIN a position-season group (so a WR is graded against other WRs that
+year, not against RBs). 0 = worst in class, 100 = best in class.
 WEIGHTS are per-position and fully tunable (blueprint section 6).
 
 NOTE ON SCORING FORMAT
-  The three grades describe role + talent and are FORMAT-AGNOSTIC. PPR vs
-  Half-PPR points are carried alongside (ppg_ppr / ppg_half) so the app can
-  display either and so we can later fold production into the Overall if we
-  choose. This v1 keeps Overall as a pure grade blend - a calibration knob
-  we will tune together.
+The three grades describe role + talent and are FORMAT-AGNOSTIC. PPR vs
+Half-PPR points are carried alongside (ppg_ppr / ppg_half) so the app can
+display either and so we can later fold production into the Overall if we
+choose. This v1 keeps Overall as a pure grade blend - a calibration knob
+we will tune together.
+
+CONTEXT (updated): context now = 60% team environment + 40% the player's own
+opportunity, so a strong offense can't float a player with no role. The team
+environment also reads a forward-looking 2026 outlook (off_outlook), injected
+upstream from team_context_2026.csv.
 """
 
 import argparse
@@ -35,27 +39,33 @@ WEIGHTS = {
     "TE": (0.50, 0.25, 0.25),
 }
 
-# Overall = (1 - PROD_W) * role-grade blend  +  PROD_W * production percentile.
+# Overall = (1 - PROD_W) * role-grade blend + PROD_W * production percentile.
 # Production is format-specific, so PPR and Half-PPR produce different rankings.
 PROD_W = 0.25
+
+# how much of context is the player's own involvement vs. the team environment.
+# 0.40 -> context = 0.60*team_env + 0.40*opportunity (fixes "good offense floats
+# a no-role player"). Set to 0.0 to restore pure team-environment context.
+CONTEXT_INVOLVEMENT_W = 0.40
 
 # component metrics feeding each grade, per position
 GRADE_INPUTS = {
     # 'rz_tgt_share' / 'rz_rush_share' are used only when present (red-zone data on)
+    # 'off_outlook' is used only when present (injected from team_context_2026.csv)
     "WR": {
         "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game", "rz_tgt_share"],
         "efficiency": ["yards_per_target", "catch_rate", "td_per_target"],
-        "context": ["plays_per_game", "proe", "pass_rate"],
+        "context": ["plays_per_game", "proe", "pass_rate", "off_outlook"],
     },
     "TE": {
         "opportunity": ["tgt_share_season", "wopr", "air_yards_share", "tgts_per_game", "rz_tgt_share"],
         "efficiency": ["yards_per_target", "catch_rate", "td_per_target"],
-        "context": ["plays_per_game", "proe", "pass_rate"],
+        "context": ["plays_per_game", "proe", "pass_rate", "off_outlook"],
     },
     "RB": {
         "opportunity": ["rush_share", "carries_per_game", "touch_share", "tgts_per_game", "rz_rush_share"],
         "efficiency": ["yards_per_carry", "yards_per_touch", "catch_rate", "td_per_touch"],
-        "context": ["plays_per_game", "run_rate"],
+        "context": ["plays_per_game", "run_rate", "off_outlook"],
     },
 }
 
@@ -86,6 +96,12 @@ def score_season(df, season, min_games=6):
         for grade, cols in GRADE_INPUTS[pos].items():
             pcts = pd.DataFrame({c: _pct(grp[c]) for c in cols if c in grp.columns})
             grades[grade] = pcts.mean(axis=1, skipna=True)
+
+        # context = team environment blended with the player's own involvement,
+        # so a great offense can't float a player who barely plays.
+        grades["context"] = ((1 - CONTEXT_INVOLVEMENT_W) * grades["context"]
+                             + CONTEXT_INVOLVEMENT_W * grades["opportunity"])
+
         grp["opportunity"] = grades["opportunity"].round(1)
         grp["efficiency"] = grades["efficiency"].round(1)
         grp["context"] = grades["context"].round(1)
@@ -103,7 +119,6 @@ def score_season(df, season, min_games=6):
         grp["pos_rank_ppr"] = grp["overall_ppr"].rank(ascending=False, method="min").astype(int)
         grp["pos_rank_half"] = grp["overall_half"].rank(ascending=False, method="min").astype(int)
         rows.append(grp)
-
     out = pd.concat(rows, ignore_index=True)
     out["overall_rank_ppr"] = out["overall_ppr"].rank(ascending=False, method="min").astype(int)
     out["overall_rank_half"] = out["overall_half"].rank(ascending=False, method="min").astype(int)
@@ -114,7 +129,7 @@ def score_season(df, season, min_games=6):
         "opportunity", "efficiency", "context",
         "tgt_share_season", "rush_share", "wopr", "ppg_ppr", "ppg_half", "total_tds",
     ]
-    if "headshot_url" in out.columns:   # player faces (private use), if the spine carries them
+    if "headshot_url" in out.columns:  # player faces (private use), if the spine carries them
         keep.append("headshot_url")
     return out[keep].sort_values("overall_ppr", ascending=False).reset_index(drop=True)
 
@@ -132,7 +147,6 @@ def main():
     ap.add_argument("--out", default="flex_rankings.csv")
     ap.add_argument("--min-games", type=int, default=6)
     args = ap.parse_args()
-
     df = pd.read_csv(args.spine)
     ranked = score_season(df, args.season, args.min_games)
     ranked["grade_ppr"] = ranked["overall_ppr"].map(letter)

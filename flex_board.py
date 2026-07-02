@@ -7,7 +7,9 @@ fields. Analysts roll into an Analyst Composite (unbiased avg across sources),
 which is what feeds MASTER -> Model + My + Analyst Composite.
 """
 
+import os
 import re
+
 import numpy as np
 import pandas as pd
 
@@ -22,6 +24,32 @@ def norm(n):
     n = re.sub(r"[^a-z ]", "", n)
     n = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", n)
     return re.sub(r"\s+", "", n)
+
+
+# ---------------------------------------------------------------------------
+# 2026 team context — forward-looking pass rate / pace / PROE + offensive
+# outlook (regressed historicals + offseason coaching adjustments). Overrides
+# the projected spine's team-environment columns before scoring, so context
+# reflects the 2026 setup rather than an unsustainable prior season. No-op if
+# the file is absent, so the pipeline still runs without it.
+# ---------------------------------------------------------------------------
+def apply_team_context_2026(spine, path="team_context_2026.csv"):
+    if not os.path.exists(path):
+        return spine
+    tc = pd.read_csv(path)
+    tc["recent_team"] = tc["team"].replace({"AZ": "ARI"})
+    ren = {"proj_pass_rate": "_pass_rate", "proj_pace": "_plays", "proj_proe": "_proe"}
+    tc = tc.rename(columns=ren)
+    cols = ["recent_team", "_pass_rate", "_plays", "_proe"]
+    if "off_outlook" in tc.columns:
+        cols.append("off_outlook")
+    spine = spine.merge(tc[cols], on="recent_team", how="left")
+    for src, dst in [("_pass_rate", "pass_rate"), ("_plays", "plays_per_game"), ("_proe", "proe")]:
+        if dst in spine.columns:
+            spine[dst] = spine[src].fillna(spine[dst])
+        else:
+            spine[dst] = spine[src]
+    return spine.drop(columns=["_pass_rate", "_plays", "_proe"])
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +119,7 @@ def _long_mult(pos, age):
     if pos == "WR":
         return float(np.clip(1 + (26 - age) * 0.05, 0.6, 1.5))
     if pos == "QB":
-        return float(np.clip(1 + (29 - age) * 0.03, 0.7, 1.3))   # QBs age well
+        return float(np.clip(1 + (29 - age) * 0.03, 0.7, 1.3))  # QBs age well
     return float(np.clip(1 + (27 - age) * 0.04, 0.6, 1.4))  # TE
 
 
@@ -105,11 +133,10 @@ def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=No
         redraft_sources.append(posrank_namepos(udk_redraft))
     if dyn_startup is not None and len(dyn_startup):
         dynasty_sources += dynasty_startup_sources(dyn_startup)
-
     rb = flex_prospect.rookie_base(rookies, hist) if rookies is not None and len(rookies) else None
     spine = flex_project.project(hist, rosters, method="scheme", rookie_base=rb)
+    spine = apply_team_context_2026(spine)   # forward-looking 2026 team environment
     ranked = flex_score.score_season(spine, season, min_games=1)
-
     extra_cols = [c for c in ["is_rookie", "prospect", "age"] if c in spine.columns]
     extra = spine[["player_display_name", "position", "recent_team"] + extra_cols].drop_duplicates()
     ranked = ranked.merge(extra, on=["player_display_name", "position", "recent_team"], how="left")
@@ -118,22 +145,18 @@ def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=No
     for c in ["prospect", "age"]:
         if c not in ranked.columns:
             ranked[c] = np.nan
-
     # QB track (superflex): project + fold QBs into the same board
     if qb_hist is not None and len(qb_hist):
         qrows = flex_qb.project_qb(qb_hist, rosters, hist, pass_td=pass_td, season=season)
         ranked = pd.concat([ranked, qrows], ignore_index=True, sort=False)
-        ranked["is_rookie"] = ranked["is_rookie"].fillna(0).astype(int)
-        for c in ["prospect", "age"]:
-            if c not in ranked.columns:
-                ranked[c] = np.nan
-
+    ranked["is_rookie"] = ranked["is_rookie"].fillna(0).astype(int)
+    for c in ["prospect", "age"]:
+        if c not in ranked.columns:
+            ranked[c] = np.nan
     ranked["nk"] = ranked["player_display_name"].map(norm)
-
     # analyst composites (unbiased avg across all sources)
     ranked["a_rd"] = _combine_sources(ranked, redraft_sources)
     ranked["a_dyn"] = _combine_sources(ranked, dynasty_sources)
-
     # dynasty score (age-aware; rookies prospect-led)
     ranked["lf"] = ranked.apply(lambda r: _long_mult(r["position"], r["age"]), axis=1)
     ranked["dyn_raw"] = ranked["overall_ppr"] * ranked["lf"]
@@ -148,7 +171,6 @@ def build_board(hist, rosters, rookies, redraft_sources=None, dynasty_sources=No
 def board_records(ranked):
     def i_or_none(v):
         return None if pd.isna(v) else int(round(v))
-
     recs = []
     for _, r in ranked.iterrows():
         recs.append({
