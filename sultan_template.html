@@ -56,6 +56,8 @@ tr.pr:hover td{background:#fff7df;cursor:pointer;}
 tr.tierhdr td{background:linear-gradient(90deg,var(--teal),var(--pink));color:#fff;font-family:'Bowlby One SC';font-size:13px;letter-spacing:.5px;padding:5px 10px;border:2px solid var(--ink);text-shadow:1px 1px 0 rgba(0,0,0,.35);}
 tr.tband0 td:first-child{box-shadow:inset 4px 0 0 var(--teal);}
 tr.tband1 td:first-child{box-shadow:inset 4px 0 0 var(--pink);}
+.projnote{font-size:12px;opacity:.75;margin:6px 2px 12px;line-height:1.35;}
+tr.rookrow td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
 #scrim{display:none;}
 #scrim.on{display:block;min-height:100vh;}
@@ -176,6 +178,7 @@ td.adp,th.adp{color:var(--purple);font-weight:700;}
 <nav class="top" id="topnav">
   <button data-v="rankings" class="on">Rankings</button>
   <button data-v="master">MASTER</button>
+  <button data-v="proj">&#128200; Projections</button>
   <button data-v="research">&#129514; Research</button>
   <button data-v="rookie">&#127944; Rookies</button>
   <button data-v="college">&#127891; College</button>
@@ -203,6 +206,7 @@ td.adp,th.adp{color:var(--purple);font-weight:700;}
   </div>
   <div id="view-master" class="view" style="display:none"><div class="card90"><div id="master-list"></div></div>
     <p class="note">MASTER = average of Model rank + My rank + Analyst rank (per position).</p></div>
+  <div id="view-proj" class="view" style="display:none"><p class="projnote" id="proj-note"></p><div id="proj-list"></div></div>
   <div id="view-rookie" class="view" style="display:none">
     <div id="rookie-list"></div>
   </div>
@@ -448,9 +452,27 @@ function renderMarket(kind){
   document.getElementById('research-'+kind).innerHTML=h;
 }
 
+function renderProjections(){
+  var rows=filtered().filter(function(r){return r.p_pts_ppr!=null||r.p_pts_half!=null;});
+  var ptsF=function(r){return fmt==='half'?r.p_pts_half:r.p_pts_ppr;};
+  rows=rows.slice().sort(function(a,b){return (ptsF(b)==null?-1:ptsF(b))-(ptsF(a)==null?-1:ptsF(a));});
+  rows=applySort(rows,'rk-proj',{pts:function(r){return ptsF(r);},tgt:function(r){return r.p_tgt;},rec:function(r){return r.p_rec;},ryd:function(r){return r.p_ryd;},rtd:function(r){return r.p_rtd;},car:function(r){return r.p_car;},ruy:function(r){return r.p_ruy;},rutd:function(r){return r.p_rutd;}});
+  document.getElementById('proj-note').textContent='Bottom-up 2026 stat projections \u2014 volume \u00d7 efficiency, red-zone-driven TDs. Points shown for '+(fmt==='half'?'Half-PPR':'Full PPR')+'. Tap a header to sort. Rookies (\u25be tinted) are archetype allocations \u2014 lower confidence.';
+  var n0=function(v){return v==null?'\u2013':Math.round(v);};
+  var n1=function(v){return v==null?'\u2013':(Math.round(v*10)/10).toFixed(1);};
+  var h='<table><thead><tr><th>#</th><th>Player</th><th>Tm</th>'
+    +thS('rk-proj','Tgt','tgt',-1,true)+thS('rk-proj','Rec','rec',-1,true)+thS('rk-proj','RecYd','ryd',-1,true)+thS('rk-proj','RecTD','rtd',-1,true)
+    +thS('rk-proj','Car','car',-1,true)+thS('rk-proj','RuYd','ruy',-1,true)+thS('rk-proj','RuTD','rutd',-1,true)
+    +thS('rk-proj','Pts','pts',-1,true)+'</tr></thead><tbody>';
+  rows.forEach(function(r,i){var k=encodeURIComponent(key(r));h+='<tr class="pr'+(r.is_rookie?' rookrow':'')+'" data-k="'+k+'"><td class="rk">'+(i+1)+'</td><td>'+rowFace(r)+'</td><td>'+teamCell(r)+'</td>'
+    +'<td class="r">'+n0(r.p_tgt)+'</td><td class="r">'+n0(r.p_rec)+'</td><td class="r">'+n0(r.p_ryd)+'</td><td class="r">'+n1(r.p_rtd)+'</td>'
+    +'<td class="r">'+n0(r.p_car)+'</td><td class="r">'+n0(r.p_ruy)+'</td><td class="r">'+n1(r.p_rutd)+'</td>'
+    +'<td class="r mas">'+n0(ptsF(r))+'</td></tr>';});
+  document.getElementById('proj-list').innerHTML=h+'</tbody></table>';
+}
 function renderSection(){
-  ['rankings','research','master','team','college','rookie'].forEach(function(v){document.getElementById('view-'+v).style.display=(v===section)?'':'none';});
-  var showPos=(section==='rankings')||(section==='master')||(section==='research'&&researchSub==='model');
+  ['rankings','research','master','team','college','rookie','proj'].forEach(function(v){document.getElementById('view-'+v).style.display=(v===section)?'':'none';});
+  var showPos=(section==='rankings')||(section==='master')||(section==='proj')||(section==='research'&&researchSub==='model');
   document.getElementById('posbar').style.display=showPos?'':'none';
   if(section==='rankings')renderRankings();
   else if(section==='master')renderMaster();
@@ -462,6 +484,7 @@ function renderSection(){
   }
   else if(section==='college')renderCollege();
   else if(section==='rookie')renderRookies();
+  else if(section==='proj')renderProjections();
 }
 
 /* ---- rookie rankings hub ---- */
@@ -756,6 +779,7 @@ _wireSort('model-list',renderModel);
 _wireSort('rk-list',renderRankings);
 _wireSort('master-list',renderMaster);
 _wireSort('rookie-list',renderRookies);
+_wireSort('proj-list',renderProjections);
 _wireSort('college-list',renderCollege);
 renderSection();
 (function(){
