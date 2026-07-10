@@ -66,6 +66,7 @@ tr.rookrow td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .flagcount{display:inline-block;font-family:'Space Grotesk';font-size:11px;background:var(--yellow);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:0 8px;margin-left:8px;vertical-align:middle;box-shadow:1px 1px 0 var(--ink);}
 .flagempty{font-size:12px;opacity:.65;margin:6px 2px 2px;}
 .flagwhy{font-size:12px;color:#6b5b8a;}
+tr.flagcat td{background:var(--purple);color:#fff;font-family:'Lilita One',cursive;letter-spacing:.5px;font-size:12px;padding:4px 10px;border:2px solid var(--ink);}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
 #scrim{display:none;}
 #scrim.on{display:block;min-height:100vh;}
@@ -346,7 +347,28 @@ function renderMaster(){
   document.getElementById('master-list').innerHTML=h+'</tbody></table>';
 }
 
-var FLAGS={"QB":[],"RB":[],"WR":[],"TE":[]};
+var FLAGS={
+"QB":[
+{name:"Lamar Jackson",cat:"Early Round Target",note:""},
+{name:"Jayden Daniels",cat:"Mid Round Targets",note:""},
+{name:"Trevor Lawrence",cat:"Mid Round Targets",note:""},
+{name:"Kyler Murray",cat:"Late Round Target",note:""}
+],
+"RB":[
+{name:"Chase Brown",note:""},
+{name:"Bhayshul Tuten",note:""},
+{name:"Jonathon Brooks",note:""}
+],
+"WR":[
+{name:"Terry McLaurin",note:""},
+{name:"Emeka Egbuka",note:""},
+{name:"Carnell Tate",note:""}
+],
+"TE":[
+{name:"Colston Loveland",note:""},
+{name:"Chig Okonkwo",note:""}
+]
+};
 var FPTAKE={
 "ARI":{v:"\u2191 Marvin Harrison Jr.  \u00b7  ~ Mike LaFleur, Trey McBride, Jeremiyah Love  \u00b7  \u2193 Michael Wilson",t:"LaFleur's efficiency record is poor, but his Jets teams passed at high volume in negative game scripts, and a weak Arizona defense plus a low win total should keep them trailing often. That volume-through-bad-scripts path is why Heath likes Marvin Harrison Jr. as a Year 3 breakout at a discounted ADP. He is cooler on McBride (expensive, garbage-time heavy) and Wilson, and only lukewarm on rookie Jeremiyah Love given the Allgeier committee and low team total."},
 "ATL":{v:"\u2191 Bijan Robinson  \u00b7  ~ Tommy Rees, Kyle Pitts",t:"Rees is not expected to lift the offense beyond its talent, but his history points to heavy back and tight end involvement. That is great for Bijan Robinson, since Rees funneled a large share of designed targets to running backs after taking over Cleveland's play-calling, reinforcing Bijan as a 1.02-caliber pick. His TE-friendly past nudges Kyle Pitts up slightly, but not enough for Heath to want him at cost."},
@@ -511,7 +533,9 @@ function renderFlags(){
       html+='<p class="flagempty">No '+pos+' flags planted yet.</p>';
     } else {
       html+='<table><thead><tr><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th><th>Why</th></tr></thead><tbody>';
+      var _lc='';
       list.forEach(function(it){
+        if(it.cat&&it.cat!==_lc){_lc=it.cat;html+='<tr class="flagcat"><td colspan="5">'+it.cat+'</td></tr>';}
         var r=findByName(it.name);
         var face=r?('<span class="pr" data-k="'+encodeURIComponent(key(r))+'">'+rowFace(r)+'</span>'):('<b>'+it.name+'</b>');
         var tm=r?teamCell(r):(it.team||'\u2013');
