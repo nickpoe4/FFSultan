@@ -24,6 +24,7 @@ import flex_spine
 import flex_board
 import flex_qb
 import flex_market
+import flex_project_stats
 
 SEASONS = [2023, 2024, 2025]
 st.set_page_config(page_title="Sultan — Fantasy Football Model", layout="wide")
@@ -204,6 +205,10 @@ if c2.button("↻ Refresh data"):
 
 adp, adp_src = adp_weekly()
 records = flex_market.attach_adp(build(), adp)
+try:
+    records = flex_project_stats.attach(records, _pd(load_history()).to_dict("records"))
+except Exception as e:
+    st.info(f"Stat projections skipped ({e}).")
 market = flex_market.both_markets(records)
 template = pathlib.Path("sultan_template.html").read_text()
 html = (template.replace("__DATA__", json.dumps(records, separators=(",", ":")))
