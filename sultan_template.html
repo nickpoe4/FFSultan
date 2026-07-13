@@ -70,6 +70,18 @@ tr.flagcat td{background:var(--purple);color:#fff;font-family:'Lilita One',cursi
 .pcblock{margin-bottom:12px;}
 .pcteam{font-family:'Bowlby One SC';font-size:16px;color:var(--purple);}
 .pcchange{font-family:'Space Grotesk';font-size:12px;font-weight:700;opacity:.8;margin:2px 0 7px;}
+.dground{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--cream);border:2px solid var(--ink);border-radius:12px;padding:8px 10px;margin-bottom:8px;box-shadow:3px 3px 0 var(--ink);}
+.dgrd{font-family:'Bowlby One SC';font-size:13px;color:var(--purple);min-width:74px;}
+.dgchips{display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center;}
+.dgempty{opacity:.4;font-size:13px;}
+.dgchip{display:inline-flex;align-items:center;gap:4px;background:var(--teal);color:var(--ink);border:2px solid var(--ink);border-radius:20px;padding:2px 4px 2px 10px;font-family:'Space Grotesk';font-size:13px;font-weight:700;}
+.dgname{cursor:pointer;}
+.dgname em{font-weight:400;font-style:normal;opacity:.7;font-size:11px;}
+.dgchip .nofind{cursor:default;color:#7a2e2e;}
+.dgx{border:none;background:rgba(0,0,0,.15);color:var(--ink);border-radius:50%;width:18px;height:18px;line-height:1;cursor:pointer;font-size:13px;font-family:'Space Grotesk';}
+.dgx:hover{background:var(--pink);color:#fff;}
+.dgadd{border:2px solid var(--ink);border-radius:9px;padding:5px 9px;font-family:'Space Grotesk';font-size:13px;background:#fff;color:var(--ink);min-width:150px;}
+.dgadd:focus{outline:none;border-color:var(--purple);}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
 #scrim{display:none;}
 #scrim.on{display:block;min-height:100vh;}
@@ -192,6 +204,7 @@ td.adp,th.adp{color:var(--purple);font-weight:700;}
   <button data-v="master">MASTER</button>
   <button data-v="proj">&#128200; Projections</button>
   <button data-v="flags">&#128681; Flag Plants</button>
+  <button data-v="draft">&#128203; Draft Guide</button>
   <button data-v="research">&#129514; Research</button>
   <button data-v="rookie">&#127944; Rookies</button>
   <button data-v="college">&#127891; College</button>
@@ -220,6 +233,7 @@ td.adp,th.adp{color:var(--purple);font-weight:700;}
   </div>
   <div id="view-master" class="view" style="display:none"><div class="card90"><div id="master-list"></div></div>
     <p class="note">MASTER = average of Model rank + My rank + Analyst rank (per position).</p></div>
+  <div id="view-draft" class="view" style="display:none"><div id="draft-list"></div></div>
   <div id="view-flags" class="view" style="display:none"><div id="flags-list"></div></div>
   <div id="view-proj" class="view" style="display:none"><p class="projnote" id="proj-note"></p><div id="proj-list"></div></div>
   <div id="view-rookie" class="view" style="display:none">
@@ -594,8 +608,31 @@ function renderPlaycallers(){
   h+='<div class="fptattr" style="margin:8px 2px 22px">Summary of Ryan Heath\'s 2026 New Playcallers analysis (Fantasy Points). Full article linked above.</div>';
   document.getElementById('pc-list').innerHTML=h;
 }
+function dgKey(){return 'sultan90_draftguide';}
+function dgGet(){try{return JSON.parse(localStorage.getItem(dgKey()))||{};}catch(e){return {};}}
+function dgSave(o){try{localStorage.setItem(dgKey(),JSON.stringify(o));}catch(e){}}
+function dgAdd(el){var rd=el.dataset.rd;var nm=(el.value||'').trim();if(!nm)return;var r=findByName(nm);var o=dgGet();if(!o[rd])o[rd]=[];o[rd].push(r?r.name:nm);dgSave(o);el.value='';renderDraft();var nx=document.querySelector('.dgadd[data-rd="'+rd+'"]');if(nx)nx.focus();}
+function dgDel(rd,i){var o=dgGet();if(o[rd]){o[rd].splice(i,1);if(!o[rd].length)delete o[rd];dgSave(o);renderDraft();}}
+function renderDraft(){
+  var o=dgGet();
+  var dl='<datalist id="dg-players">'+DATA.map(function(r){return '<option value="'+mktEsc(r.name)+'">';}).join('')+'</datalist>';
+  var h=dl+'<div class="card90" style="margin-bottom:14px"><div class="cbig" style="color:var(--purple)">\uD83D\uDCCB Draft Guide</div><small>Round-by-round targets based on Sleeper ADP. Start typing a name to autocomplete, press Enter to add, then tap any player to open their profile. Saved on this device.</small></div>';
+  for(var rd=1;rd<=14;rd++){
+    var list=o[rd]||[];
+    h+='<div class="dground"><div class="dgrd">Round '+rd+'</div><div class="dgchips">';
+    if(!list.length){h+='<span class="dgempty">\u2014</span>';}
+    list.forEach(function(nm,i){
+      var r=findByName(nm);
+      var sub=r?(' <em>'+r.pos+(r.team?(' \u00b7 '+r.team):'')+'</em>'):'';
+      var name=r?('<span class="pr dgname" data-k="'+encodeURIComponent(key(r))+'">'+mktEsc(nm)+sub+'</span>'):('<span class="dgname nofind">'+mktEsc(nm)+'</span>');
+      h+='<span class="dgchip">'+name+'<button class="dgx" onclick="dgDel(\''+rd+'\','+i+')" title="Remove">\u00d7</button></span>';
+    });
+    h+='</div><input list="dg-players" class="dgadd" data-rd="'+rd+'" placeholder="Add target\u2026" onchange="dgAdd(this)"></div>';
+  }
+  document.getElementById('draft-list').innerHTML=h;
+}
 function renderSection(){
-  ['rankings','research','master','team','college','rookie','proj','flags'].forEach(function(v){document.getElementById('view-'+v).style.display=(v===section)?'':'none';});
+  ['rankings','research','master','team','college','rookie','proj','flags','draft'].forEach(function(v){document.getElementById('view-'+v).style.display=(v===section)?'':'none';});
   var showPos=(section==='rankings')||(section==='master')||(section==='proj')||(section==='research'&&researchSub==='model');
   document.getElementById('posbar').style.display=showPos?'':'none';
   if(section==='rankings')renderRankings();
@@ -611,6 +648,7 @@ function renderSection(){
   else if(section==='rookie')renderRookies();
   else if(section==='proj')renderProjections();
   else if(section==='flags')renderFlags();
+  else if(section==='draft')renderDraft();
 }
 
 /* ---- rookie rankings hub ---- */
