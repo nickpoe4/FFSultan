@@ -67,6 +67,9 @@ tr.rookrow td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .flagempty{font-size:12px;opacity:.65;margin:6px 2px 2px;}
 .flagwhy{font-size:12px;color:#6b5b8a;}
 tr.flagcat td{background:var(--purple);color:#fff;font-family:'Lilita One',cursive;letter-spacing:.5px;font-size:12px;padding:4px 10px;border:2px solid var(--ink);}
+.pcblock{margin-bottom:12px;}
+.pcteam{font-family:'Bowlby One SC';font-size:16px;color:var(--purple);}
+.pcchange{font-family:'Space Grotesk';font-size:12px;font-weight:700;opacity:.8;margin:2px 0 7px;}
 .drag{cursor:grab;color:var(--purple);font-weight:800;margin-right:4px;}
 #scrim{display:none;}
 #scrim.on{display:block;min-height:100vh;}
@@ -207,9 +210,10 @@ td.adp,th.adp{color:var(--purple);font-weight:700;}
     <p class="note" id="rk-note"></p>
   </div>
   <div id="view-research" class="view" style="display:none">
-    <div class="subnav" id="researchsub"><button data-r="model" class="on">Model</button><button data-r="playsheet">Play Sheet</button><button data-r="under">Undervalued</button><button data-r="over">Overvalued</button><button data-r="rocket">&#128640; Breakouts</button></div>
+    <div class="subnav" id="researchsub"><button data-r="model" class="on">Model</button><button data-r="playsheet">Play Sheet</button><button data-r="pc">New Playcallers</button><button data-r="under">Undervalued</button><button data-r="over">Overvalued</button><button data-r="rocket">&#128640; Breakouts</button></div>
     <div id="research-model"><div class="card90"><div id="model-list"></div></div></div>
     <div id="research-playsheet" style="display:none"><div id="playsheet"></div></div>
+    <div id="research-pc" style="display:none"><div id="pc-list"></div></div>
     <div id="research-under" style="display:none"></div>
     <div id="research-over" style="display:none"></div>
     <div id="research-rocket" style="display:none"></div>
@@ -549,6 +553,47 @@ function renderFlags(){
   });
   document.getElementById('flags-list').innerHTML=html;
 }
+function renderPlaycallers(){
+  var A='https://www.fantasypoints.com/nfl/articles/2026/new-playcallers-fantasy-football-impact';
+  var PC={
+   "ARI":["Arizona Cardinals","Mike LaFleur replaces Drew Petzing"],
+   "ATL":["Atlanta Falcons","Tommy Rees replaces Zac Robinson"],
+   "BAL":["Baltimore Ravens","Declan Doyle replaces Todd Monken"],
+   "CAR":["Carolina Panthers","Brad Idzik replaces Dave Canales"],
+   "CLE":["Cleveland Browns","Todd Monken replaces Kevin Stefanski / Tommy Rees"],
+   "DEN":["Denver Broncos","Davis Webb replaces Sean Payton"],
+   "DET":["Detroit Lions","Drew Petzing replaces John Morton / Dan Campbell"],
+   "LAC":["Los Angeles Chargers","Mike McDaniel replaces Greg Roman"],
+   "LV":["Las Vegas Raiders","Klint Kubiak replaces Chip Kelly / Greg Olson"],
+   "MIA":["Miami Dolphins","Bobby Slowik replaces Mike McDaniel"],
+   "NYG":["New York Giants","Matt Nagy replaces Mike Kafka"],
+   "NYJ":["New York Jets","Frank Reich replaces Tanner Engstrand"],
+   "PHI":["Philadelphia Eagles","Sean Mannion replaces Kevin Patullo"],
+   "PIT":["Pittsburgh Steelers","Mike McCarthy replaces Arthur Smith"],
+   "SEA":["Seattle Seahawks","Brian Fleury replaces Klint Kubiak"],
+   "TB":["Tampa Bay Buccaneers","Zac Robinson replaces Josh Grizzard"],
+   "TEN":["Tennessee Titans","Brian Daboll replaces Brian Callahan / Bo Hardegree"],
+   "WAS":["Washington Commanders","David Blough replaces Kliff Kingsbury"]
+  };
+  var order=['ARI','ATL','BAL','CAR','CLE','DEN','DET','LAC','LV','MIA','NYG','NYJ','PHI','PIT','SEA','TB','TEN','WAS'];
+  var h='<div class="card90"><div class="cbig" style="color:var(--purple)">2026 New Playcallers: Fantasy Football Impact</div><small>Condensed summary of Ryan Heath\'s analysis \u2014 Fantasy Points. <a class="fptlink" href="'+A+'" target="_blank" rel="noopener">Read the full article \u2197</a></small></div>';
+  h+='<div class="card90"><div class="tpsec">The Framework \u2014 why playcalling moves fantasy</div>'
+    +'<p class="tptext">Offenses from the McVay/Shanahan tree (plus Ben Johnson) have produced a wildly disproportionate share of league-winning fantasy seasons. But with nearly half the NFL running some \u201cMcShanahan\u201d variant in 2026, coaching-tree labels alone are no longer an edge \u2014 what matters is the mechanics underneath. The piece leans on a handful of efficiency hacks:</p>'
+    +'<p class="tptext"><b>Play-action</b> is the biggest lever, lifting a typical WR\'s per-route fantasy scoring by ~40% and a TE\'s by ~60%. <b>Motion</b> \u2014 especially during-snap motion \u2014 adds more still; the snap-timed subset drove most of 2025\'s gains (about +43% per route). <b>Personnel</b> matters too: WRs are roughly 32% more efficient per route with two or fewer wideouts on the field than with three-plus. <b>Designed targets</b> (screens and manufactured touches) are worth ~1.7 PPR points apiece, and some playcallers funnel them to specific players or to the backfield. <b>Horizontal-breaking routes</b> are one more edge certain playcaller/receiver pairings exploit.</p>'
+    +'<p class="tptext">Each team below carries a quick verdict \u2014 <b>\u2191 positive</b>, <b>~ mixed</b>, or <b>\u2193 negative</b> \u2014 on the playcaller and the relevant players.</p></div>';
+  h+='<div class="card90"><div class="tpsec">Returning playcallers \u2014 quick hits</div>'
+    +'<p class="tptext">A few notes on teams keeping their playcaller. <b>Kyler Murray</b> is a high-upside late QB in O\'Connell\'s pass-friendly, goal-line-aggressive Vikings offense. <b>Travis Etienne</b> likely loses screen and designed-target volume moving to Kellen Moore\'s Saints. <b>Matt LaFleur</b> has hinted at less WR-by-committee in Green Bay, helping Christian Watson and Jayden Reed. <b>Liam Coen\'s</b> Jaguars risk a committee, but the offense is elite \u2014 Trevor Lawrence and Bhayshul Tuten are strong bets. <b>Cincinnati</b> may add under-center play-action, good for Chase Brown, while Tee Higgins stays underpriced. And <b>New England\'s</b> Josh McDaniels scheme fits A.J. Brown\'s route profile well.</p></div>';
+  h+='<div class="tpsec" style="margin:16px 2px 8px">New Playcallers (18)</div>';
+  order.forEach(function(tm){
+    var fp=FPTAKE[tm]; if(!fp)return;
+    var meta=PC[tm]||[tm,''];
+    h+='<div class="card90 pcblock"><div class="pcteam">'+meta[0]+'</div>'
+      +(meta[1]?'<div class="pcchange">'+meta[1]+'</div>':'')
+      +'<div class="fptverdict">'+fp.v+'</div><p class="tptext">'+fp.t+'</p></div>';
+  });
+  h+='<div class="fptattr" style="margin:8px 2px 22px">Summary of Ryan Heath\'s 2026 New Playcallers analysis (Fantasy Points). Full article linked above.</div>';
+  document.getElementById('pc-list').innerHTML=h;
+}
 function renderSection(){
   ['rankings','research','master','team','college','rookie','proj','flags'].forEach(function(v){document.getElementById('view-'+v).style.display=(v===section)?'':'none';});
   var showPos=(section==='rankings')||(section==='master')||(section==='proj')||(section==='research'&&researchSub==='model');
@@ -556,9 +601,10 @@ function renderSection(){
   if(section==='rankings')renderRankings();
   else if(section==='master')renderMaster();
   else if(section==='research'){
-    ['model','playsheet','under','over','rocket'].forEach(function(s){document.getElementById('research-'+s).style.display=(researchSub===s)?'':'none';});
+    ['model','playsheet','pc','under','over','rocket'].forEach(function(s){document.getElementById('research-'+s).style.display=(researchSub===s)?'':'none';});
     if(researchSub==='model')renderModel();
     else if(researchSub==='playsheet')renderPlaySheet();
+    else if(researchSub==='pc')renderPlaycallers();
     else renderMarket(researchSub);
   }
   else if(section==='college')renderCollege();
