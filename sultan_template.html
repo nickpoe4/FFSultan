@@ -339,7 +339,7 @@ function renderRankings(){
     rows=rows.slice().sort(function(a,b){return mi[key(a)]-mi[key(b)];});
     window._myVisible=rows.map(key);
     note='Drag the ≡ handle or use ▲▼ to set your board. Numbers update live and save automatically. Seeded from the Analyst composite.';
-    var TM=tierMap();var TB=getTiers();var _lt=0;var h='<div class="tiertoolbar"><button class="tierctl" data-tieract="auto">&#10022; Auto-tier</button><button class="tierctl" data-tieract="clear">&#10005; Clear tiers</button><span class="tiertip">Tap &#9644; on any row to start a new tier there.</span></div><table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
+    var TM=tierMap();var TB=getTiers();var _lt=0;var h='<div class="tiertoolbar"><button class="tierctl" data-tieract="auto">&#10022; Auto-tier</button><button class="tierctl" data-tieract="clear">&#10005; Clear tiers</button><span class="tiertip">Tap &#9644; on any row to start a new tier there. Tiers are saved per position \u2014 filter to QB, RB, WR, or TE to set that group\u2019s tiers.</span></div><table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
     rows.forEach(function(r,i){var k=encodeURIComponent(key(r));var kk=key(r);var tn=TM[kk]||1;if(tn!==_lt){_lt=tn;h+='<tr class="tierhdr"><td colspan="6">Tier '+tn+'</td></tr>';}var _on=TB.indexOf(kk)>=0?' on':'';h+='<tr class="myrow tband'+(tn%2)+'" draggable="true" data-k="'+k+'"><td class="rk">'+(i+1)+'</td><td><span class="drag">≡</span><button class="mvbtn" data-mv="-1" data-k="'+k+'">▲</button><button class="mvbtn" data-mv="1" data-k="'+k+'">▼</button><button class="tierbtn'+_on+'" data-k="'+k+'" title="Start a new tier here">&#9644;</button></td><td class="pr" data-k="'+k+'">'+rowFace(r)+'</td><td>'+teamCell(r)+'</td><td class="r">'+ppg(r).toFixed(1)+'</td><td class="r adp">'+adpStr(r)+'</td></tr>';});
     document.getElementById('rk-list').innerHTML=h+'</tbody></table>';
   }
@@ -348,13 +348,13 @@ function renderRankings(){
 
 function applyVisibleOrder(visKeys){var g=getMyOrder();var set={};visKeys.forEach(function(k){set[k]=1;});var vi=0;var ng=g.map(function(k){return set[k]?visKeys[vi++]:k;});saveMyOrder(ng);}
 function moveKey(k,dir){var vis=window._myVisible.slice();var i=vis.indexOf(k);if(i<0)return;var j=i+dir;if(j<0||j>=vis.length)return;var t=vis[i];vis[i]=vis[j];vis[j]=t;applyVisibleOrder(vis);renderRankings();}
-function tkey(){return 'sultan90_tiers_'+mode+'_'+fmt;}
+function tkey(){return 'sultan90_tiers_'+mode+'_'+fmt+'_'+posf;}
 function getTiers(){var s=localStorage.getItem(tkey());if(s){try{return JSON.parse(s)||[];}catch(e){}}return [];}
 function saveTiers(a){localStorage.setItem(tkey(),JSON.stringify(a));}
 function toggleTier(k){var a=getTiers();var i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);saveTiers(a);}
 function clearTiers(){saveTiers([]);}
-function tierMap(){var o=getMyOrder();var set={};getTiers().forEach(function(k){set[k]=1;});var m={},t=1;o.forEach(function(k,i){if(i>0&&set[k])t++;m[k]=t;});return m;}
-function autoTier(){var o=getMyOrder();var byk={};DATA.forEach(function(r){byk[key(r)]=r;});var vals=o.map(function(k){var r=byk[k];return r?val(r):null;});var gaps=[];for(var i=1;i<vals.length;i++){if(vals[i]!=null&&vals[i-1]!=null)gaps.push(vals[i-1]-vals[i]);}if(!gaps.length){saveTiers([]);return;}var sorted=gaps.slice().sort(function(a,b){return a-b;});var thr=sorted[Math.floor(sorted.length*0.85)];var rng=(vals[0]-vals[vals.length-1])||1;var floor=rng*0.03;if(thr<floor)thr=floor;var breaks=[];for(var j=1;j<o.length;j++){if(vals[j]!=null&&vals[j-1]!=null&&(vals[j-1]-vals[j])>=thr)breaks.push(o[j]);}if(breaks.length>14)breaks=breaks.slice(0,14);saveTiers(breaks);}
+function tierMap(){var o=window._myVisible||getMyOrder();var set={};getTiers().forEach(function(k){set[k]=1;});var m={},t=1;o.forEach(function(k,i){if(i>0&&set[k])t++;m[k]=t;});return m;}
+function autoTier(){var o=window._myVisible||getMyOrder();var byk={};DATA.forEach(function(r){byk[key(r)]=r;});var vals=o.map(function(k){var r=byk[k];return r?val(r):null;});var gaps=[];for(var i=1;i<vals.length;i++){if(vals[i]!=null&&vals[i-1]!=null)gaps.push(vals[i-1]-vals[i]);}if(!gaps.length){saveTiers([]);return;}var sorted=gaps.slice().sort(function(a,b){return a-b;});var thr=sorted[Math.floor(sorted.length*0.85)];var rng=(vals[0]-vals[vals.length-1])||1;var floor=rng*0.03;if(thr<floor)thr=floor;var breaks=[];for(var j=1;j<o.length;j++){if(vals[j]!=null&&vals[j-1]!=null&&(vals[j-1]-vals[j])>=thr)breaks.push(o[j]);}if(breaks.length>14)breaks=breaks.slice(0,14);saveTiers(breaks);}
 
 function renderMaster(){
   var mi=myIndexMap();
