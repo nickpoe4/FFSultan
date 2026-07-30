@@ -343,7 +343,7 @@ function renderRankings(){
     rows=rows.slice().sort(function(a,b){return mi[key(a)]-mi[key(b)];});
     window._myVisible=rows.map(key);
     note='Drag the ≡ handle or use ▲▼ to set your board. Numbers update live and save automatically. Seeded from the Analyst composite.';
-    var TM=tierMap();var TB=getTiers();var _lt=0;var h='<div class="tiertoolbar"><button class="tierctl" data-tieract="auto">&#10022; Auto-tier</button><button class="tierctl" data-tieract="clear">&#10005; Clear tiers</button><span class="tiertip">Tap &#9644; on any row to start a new tier there. Tiers are saved per position \u2014 filter to QB, RB, WR, or TE to set that group\u2019s tiers.</span></div><table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
+    var TM=tierMap();var TB=getTiers();var _lt=0;var h='<div class="tiertoolbar"><button class="tierctl" data-tieract="adp">&#8645; Sort by ADP</button><button class="tierctl" data-tieract="auto">&#10022; Auto-tier</button><button class="tierctl" data-tieract="clear">&#10005; Clear tiers</button><span class="tiertip">Tap &#9644; on any row to start a new tier there. Tiers are saved per position \u2014 filter to QB, RB, WR, or TE to set that group\u2019s tiers.</span></div><table><thead><tr><th>#</th><th>Move</th><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th></tr></thead><tbody>';
     rows.forEach(function(r,i){var k=encodeURIComponent(key(r));var kk=key(r);var tn=TM[kk]||1;if(tn!==_lt){_lt=tn;h+='<tr class="tierhdr"><td colspan="6">Tier '+tn+'</td></tr>';}var _on=TB.indexOf(kk)>=0?' on':'';h+='<tr class="myrow tband'+(tn%2)+'" draggable="true" data-k="'+k+'"><td class="rk">'+(i+1)+'</td><td><span class="drag">≡</span><button class="mvbtn" data-mv="-1" data-k="'+k+'">▲</button><button class="mvbtn" data-mv="1" data-k="'+k+'">▼</button><button class="tierbtn'+_on+'" data-k="'+k+'" title="Start a new tier here">&#9644;</button></td><td class="pr" data-k="'+k+'">'+rowFace(r)+'</td><td>'+teamCell(r)+'</td><td class="r">'+ppg(r).toFixed(1)+'</td><td class="r adp">'+adpStr(r)+'</td></tr>';});
     document.getElementById('rk-list').innerHTML=h+'</tbody></table>';
   }
@@ -357,6 +357,7 @@ function getTiers(){var s=localStorage.getItem(tkey());if(s){try{return JSON.par
 function saveTiers(a){localStorage.setItem(tkey(),JSON.stringify(a));}
 function toggleTier(k){var a=getTiers();var i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);saveTiers(a);}
 function clearTiers(){saveTiers([]);}
+function sortByAdp(){var vis=(window._myVisible||[]).slice();var byk={};DATA.forEach(function(r){byk[key(r)]=r;});vis.sort(function(a,b){var va=byk[a]?adpVal(byk[a]):null,vb=byk[b]?adpVal(byk[b]):null;if(va==null&&vb==null)return 0;if(va==null)return 1;if(vb==null)return -1;return va-vb;});applyVisibleOrder(vis);}
 function tierMap(){var o=window._myVisible||getMyOrder();var set={};getTiers().forEach(function(k){set[k]=1;});var m={},t=1;o.forEach(function(k,i){if(i>0&&set[k])t++;m[k]=t;});return m;}
 function autoTier(){var o=window._myVisible||getMyOrder();var byk={};DATA.forEach(function(r){byk[key(r)]=r;});var vals=o.map(function(k){var r=byk[k];return r?val(r):null;});var gaps=[];for(var i=1;i<vals.length;i++){if(vals[i]!=null&&vals[i-1]!=null)gaps.push(vals[i-1]-vals[i]);}if(!gaps.length){saveTiers([]);return;}var sorted=gaps.slice().sort(function(a,b){return a-b;});var thr=sorted[Math.floor(sorted.length*0.85)];var rng=(vals[0]-vals[vals.length-1])||1;var floor=rng*0.03;if(thr<floor)thr=floor;var breaks=[];for(var j=1;j<o.length;j++){if(vals[j]!=null&&vals[j-1]!=null&&(vals[j-1]-vals[j])>=thr)breaks.push(o[j]);}if(breaks.length>14)breaks=breaks.slice(0,14);saveTiers(breaks);}
 
@@ -945,7 +946,7 @@ document.querySelector('.wrap').addEventListener('click',function(e){
   var tb=e.target.closest('.teambtn'); if(tb){openTeam(tb.dataset.team);return;}
   var cp=e.target.closest('.cprow'); if(cp){openProspect(parseInt(cp.dataset.i,10));return;}
   var rr=e.target.closest('.rkrow'); if(rr){openRookie(parseInt(rr.dataset.i,10));return;}
-  var tctl=e.target.closest('.tierctl'); if(tctl){if(tctl.dataset.tieract==='auto')autoTier();else clearTiers();renderRankings();return;}
+  var tctl=e.target.closest('.tierctl'); if(tctl){var _ta=tctl.dataset.tieract;if(_ta==='auto')autoTier();else if(_ta==='adp')sortByAdp();else clearTiers();renderRankings();return;}
   var tbt=e.target.closest('.tierbtn'); if(tbt){toggleTier(decodeURIComponent(tbt.dataset.k));renderRankings();return;}
   var mv=e.target.closest('.mvbtn'); if(mv){moveKey(decodeURIComponent(mv.dataset.k),parseInt(mv.dataset.mv,10));return;}
   var pr=e.target.closest('.pr'); if(pr){openCard(decodeURIComponent(pr.dataset.k).split('|')[0], e);}
