@@ -66,6 +66,10 @@ tr.rookrow td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .flagcount{display:inline-block;font-family:'Space Grotesk';font-size:11px;background:var(--yellow);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:0 8px;margin-left:8px;vertical-align:middle;box-shadow:1px 1px 0 var(--ink);}
 .flagempty{font-size:12px;opacity:.65;margin:6px 2px 2px;}
 .flagwhy{font-size:12px;color:#6b5b8a;}
+.myguys{background:linear-gradient(180deg,rgba(255,210,63,.20),rgba(255,210,63,0));border:2px solid var(--ink);border-radius:14px;padding:10px 12px;box-shadow:4px 4px 0 var(--ink);}
+.myguystitle{color:var(--pink)!important;border-bottom-color:var(--pink)!important;}
+.flagname{cursor:pointer;}
+.flagname em.flagmeta{font-style:normal;opacity:.6;font-size:11px;font-weight:400;margin-left:5px;}
 tr.flagcat td{background:var(--purple);color:#fff;font-family:'Lilita One',cursive;letter-spacing:.5px;font-size:12px;padding:4px 10px;border:2px solid var(--ink);}
 .pcblock{margin-bottom:12px;}
 .pcteam{font-family:'Bowlby One SC';font-size:16px;color:var(--purple);}
@@ -366,11 +370,13 @@ function renderMaster(){
 }
 
 var FLAGS={
+"MYGUYS":[],
 "QB":[
-{name:"Lamar Jackson",cat:"Early Round Target",note:""},
-{name:"Jayden Daniels",cat:"Mid Round Targets",note:""},
-{name:"Trevor Lawrence",cat:"Mid Round Targets",note:""},
-{name:"Kyler Murray",cat:"Late Round Target",note:""}
+{name:"Trevor Lawrence",cat:"Any QB in the 8th round",note:"My favorite of the bunch"},
+{name:"Justin Herbert",cat:"Any QB in the 8th round",note:""},
+{name:"Jaxon Dart",cat:"Any QB in the 8th round",note:""},
+{name:"Caleb Williams",cat:"Any QB in the 8th round",note:""},
+{name:"Dak Prescott",cat:"Any QB in the 8th round",note:""}
 ],
 "RB":[
 {name:"Chase Brown",note:""},
@@ -378,13 +384,14 @@ var FLAGS={
 {name:"Jonathon Brooks",note:""}
 ],
 "WR":[
-{name:"Terry McLaurin",note:""},
-{name:"Emeka Egbuka",note:""},
-{name:"Carnell Tate",note:""}
+{name:"Ladd McConkey",note:""},
+{name:"Parker Washington",note:""},
+{name:"Jordyn Tyson",note:""}
 ],
 "TE":[
-{name:"Colston Loveland",note:""},
-{name:"Chig Okonkwo",note:""}
+{name:"Brock Bowers",note:""},
+{name:"Chig Okonkwo",note:""},
+{name:"Dallas Goedert",note:""}
 ]
 };
 var FPTAKE={
@@ -542,27 +549,36 @@ function renderProjections(){
   document.getElementById('proj-list').innerHTML=h+'</tbody></table>';
 }
 function renderFlags(){
+  function nameCell(it){
+    var r=findByName(it.name);
+    var dk=encodeURIComponent(r?key(r):it.name);
+    var sub=r?(' <em class="flagmeta">'+r.pos+(r.team?(' \u00b7 '+r.team):'')+'</em>'):'';
+    return '<span class="pr flagname" data-k="'+dk+'">'+mktEsc(it.name)+sub+'</span>';
+  }
+  function statCells(it){
+    var r=findByName(it.name);
+    return '<td>'+(r?teamCell(r):'\u2013')+'</td><td class="r">'+(r?ppg(r).toFixed(1):'\u2013')+'</td><td class="r adp">'+(r?adpStr(r):'\u2013')+'</td>';
+  }
+  function rowsFor(list){
+    var h='<table><thead><tr><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th><th>Why</th></tr></thead><tbody>';
+    var _lc='';
+    list.forEach(function(it){
+      if(it.cat&&it.cat!==_lc){_lc=it.cat;h+='<tr class="flagcat"><td colspan="5">'+it.cat+'</td></tr>';}
+      h+='<tr class="flagrow"><td>'+nameCell(it)+'</td>'+statCells(it)+'<td class="flagwhy">'+(it.note?mktEsc(it.note):'')+'</td></tr>';
+    });
+    return h+'</tbody></table>';
+  }
+  var html='<div class="card90" style="margin-bottom:14px"><div class="cbig" style="color:var(--purple)">\uD83D\uDEA9 Flag Plants</div><small>Your priority draft targets for 2026. Click any player name to open their card. Saved on this device.</small></div>';
+  var mg=FLAGS.MYGUYS||[];
+  html+='<div class="flagsec myguys"><div class="tpsec myguystitle">\u2B50 My Guys <span class="flagcount">'+mg.length+'</span></div>';
+  html+='<p class="flagempty" style="margin:2px 0 8px">The players you\'re most bullish on this year \u2014 any position.</p>';
+  html+=mg.length?rowsFor(mg):'';
+  html+='</div>';
   var order=[['QB','Quarterbacks'],['RB','Running Backs'],['WR','Wide Receivers'],['TE','Tight Ends']];
-  var html='<div class="card90" style="margin-bottom:14px"><div class="cbig" style="color:var(--purple)">\uD83D\uDEA9 Flag Plants</div><small>Your priority draft targets for 2026 \u2014 the players you\'re planting a flag on. PPG and ADP update live with the Half/PPR toggle.</small></div>';
   order.forEach(function(pair){
     var pos=pair[0], label=pair[1], list=(FLAGS[pos]||[]);
     html+='<div class="flagsec"><div class="tpsec">'+label+' <span class="flagcount">'+list.length+'</span></div>';
-    if(!list.length){
-      html+='<p class="flagempty">No '+pos+' flags planted yet.</p>';
-    } else {
-      html+='<table><thead><tr><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th><th>Why</th></tr></thead><tbody>';
-      var _lc='';
-      list.forEach(function(it){
-        if(it.cat&&it.cat!==_lc){_lc=it.cat;html+='<tr class="flagcat"><td colspan="5">'+it.cat+'</td></tr>';}
-        var r=findByName(it.name);
-        var face=r?('<span class="pr" data-k="'+encodeURIComponent(key(r))+'">'+rowFace(r)+'</span>'):('<b>'+it.name+'</b>');
-        var tm=r?teamCell(r):(it.team||'\u2013');
-        var pg=r?ppg(r).toFixed(1):'\u2013';
-        var adp=r?adpStr(r):'\u2013';
-        html+='<tr class="flagrow"><td>'+face+'</td><td>'+tm+'</td><td class="r">'+pg+'</td><td class="r adp">'+adp+'</td><td class="flagwhy">'+(it.note?mktEsc(it.note):'')+'</td></tr>';
-      });
-      html+='</tbody></table>';
-    }
+    html+=list.length?rowsFor(list):'<p class="flagempty">No '+pos+' flags planted yet.</p>';
     html+='</div>';
   });
   document.getElementById('flags-list').innerHTML=html;
