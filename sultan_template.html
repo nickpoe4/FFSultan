@@ -820,11 +820,11 @@ function vnorm(s){s=(''+s).toLowerCase().replace(/[^a-z ]/g,'');return s.split(/
 function posAdpLabel(p){var a=p.adp_half;if(a==null)return 'Half-PPR';var n=1;DATA.forEach(function(r){if(r.pos===p.pos){var b=r.adp_half;if(b!=null&&b<a)n++;}});return p.pos+n+' \u00b7 Half-PPR';}
 function vNflTable(rows,pos,pri,pname){
   if(!rows||!rows.length) return '';
-  var passH='<th>PaYd</th><th>PaTD</th>', rushH='<th>Car</th><th>RuYd</th><th>RuTD</th>', recH='<th>Rec</th><th>Yds</th><th>TD</th>';
+  var passH='<th>PaYd</th><th>PaTD</th>', rushH='<th>Car</th><th>RuYd</th><th>RuTD</th><th>Y/C</th>', recH='<th>Rec</th><th>Yds</th><th>TD</th><th>Y/R</th>';
   var hdr=(pos==='QB')?(passH+rushH):(pos==='RB')?(rushH+recH):recH;
   function passC(s){return '<td>'+s.pyd+'</td><td>'+s.ptd+'</td>';}
-  function rushC(s){return '<td>'+s.car+'</td><td>'+s.rud+'</td><td>'+s.rutd+'</td>';}
-  function recC(s){return '<td>'+s.rec+'</td><td>'+s.ryd+'</td><td>'+s.rtd+'</td>';}
+  function rushC(s){return '<td>'+s.car+'</td><td>'+s.rud+'</td><td>'+s.rutd+'</td><td>'+(s.car?(s.rud/s.car).toFixed(1):'\u2013')+'</td>';}
+  function recC(s){return '<td>'+s.rec+'</td><td>'+s.ryd+'</td><td>'+s.rtd+'</td><td>'+(s.rec?(s.ryd/s.rec).toFixed(1):'\u2013')+'</td>';}
   var vk=vnorm(pname||'');
   var body='';
   rows.forEach(function(s){var mid=(pos==='QB')?(passC(s)+rushC(s)):(pos==='RB')?(rushC(s)+recC(s)):recC(s);
