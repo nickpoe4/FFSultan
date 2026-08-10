@@ -214,24 +214,28 @@ market = flex_market.both_markets(records)
 @st.cache_data(ttl=21600, show_spinner=False)
 def load_injuries_map():
     """Latest NFL injury designations from nflverse, keyed by normalized name.
-    Cached with a 6h TTL so injuries refresh automatically without a commit."""
+    Cached with a 6h TTL so injuries refresh automatically without a commit.
+    Note: nflverse injuries is the regular-season game-day report, so it is
+    sparse in the preseason and won't carry most training-camp injuries."""
+    import math as _math
     import re as _re
     def _vn(s):
         s = _re.sub(r"[^a-z ]", "", str(s).lower())
         return "".join(w for w in s.split() if w and w not in ("jr", "sr", "ii", "iii", "iv", "v"))
-    def _fetch(yr):
+    def _s(v):
+        if v is None:
+            return ""
+        if isinstance(v, float) and _math.isnan(v):
+            return ""
+        out = str(v).strip()
+        return "" if out.lower() in ("nan", "none") else out
+    try:
         try:
-            return _pd(nfl.load_injuries(seasons=[yr]))
+            df = _pd(nfl.load_injuries(seasons=[2026]))
         except TypeError:
-            return _pd(nfl.load_injuries([yr]))
-    df = None
-    for yr in (2026, 2025):
-        try:
-            df = _fetch(yr)
-            if df is not None and len(df):
-                break
-        except Exception:
-            df = None
+            df = _pd(nfl.load_injuries([2026]))
+    except Exception:
+        return {}
     if df is None or len(df) == 0:
         return {}
     df = df.copy()
@@ -240,26 +244,26 @@ def load_injuries_map():
         df = df.sort_values(order)
     out = {}
     for _, r in df.iterrows():
-        nm = r.get("full_name") or (str(r.get("first_name") or "") + " " + str(r.get("last_name") or "")).strip()
+        nm = _s(r.get("full_name")) or (_s(r.get("first_name")) + " " + _s(r.get("last_name"))).strip()
         if not nm:
             continue
-        status = str(r.get("report_status") or "").strip()
-        prim = str(r.get("report_primary_injury") or "").strip()
-        sec = str(r.get("report_secondary_injury") or "").strip()
-        prac = str(r.get("practice_status") or "").strip()
-        if not (status or prim or prac):
+        status = _s(r.get("report_status"))
+        prim = _s(r.get("report_primary_injury"))
+        sec = _s(r.get("report_secondary_injury"))
+        prac = _s(r.get("practice_status"))
+        # Healthy / no designation -> leave blank (skip). A player only listed as
+        # practicing (full/limited) with no reported injury is NOT injured.
+        if not status and not prim:
             continue
         inj = prim + ((" / " + sec) if sec else "")
         if status:
-            detail = status + (" \u2014 " + inj if inj else "")
-        elif inj:
-            detail = ("Limited \u2014 " + inj) if "Limited" in prac else inj
+            detail = status + ((" \u2014 " + inj) if inj else "")
         else:
-            detail = prac
+            detail = inj
         if not detail:
             continue
         entry = {"detail": detail}
-        if prac and status:
+        if prac:
             entry["timeline"] = "Practice: " + prac
         out[_vn(nm)] = entry
     return out
