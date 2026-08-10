@@ -210,8 +210,69 @@ try:
 except Exception as e:
     st.info(f"Stat projections skipped ({e}).")
 market = flex_market.both_markets(records)
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def load_injuries_map():
+    """Latest NFL injury designations from nflverse, keyed by normalized name.
+    Cached with a 6h TTL so injuries refresh automatically without a commit."""
+    import re as _re
+    def _vn(s):
+        s = _re.sub(r"[^a-z ]", "", str(s).lower())
+        return "".join(w for w in s.split() if w and w not in ("jr", "sr", "ii", "iii", "iv", "v"))
+    def _fetch(yr):
+        try:
+            return _pd(nfl.load_injuries(seasons=[yr]))
+        except TypeError:
+            return _pd(nfl.load_injuries([yr]))
+    df = None
+    for yr in (2026, 2025):
+        try:
+            df = _fetch(yr)
+            if df is not None and len(df):
+                break
+        except Exception:
+            df = None
+    if df is None or len(df) == 0:
+        return {}
+    df = df.copy()
+    order = [c for c in ("week", "date_modified") if c in df.columns]
+    if order:
+        df = df.sort_values(order)
+    out = {}
+    for _, r in df.iterrows():
+        nm = r.get("full_name") or (str(r.get("first_name") or "") + " " + str(r.get("last_name") or "")).strip()
+        if not nm:
+            continue
+        status = str(r.get("report_status") or "").strip()
+        prim = str(r.get("report_primary_injury") or "").strip()
+        sec = str(r.get("report_secondary_injury") or "").strip()
+        prac = str(r.get("practice_status") or "").strip()
+        if not (status or prim or prac):
+            continue
+        inj = prim + ((" / " + sec) if sec else "")
+        if status:
+            detail = status + (" \u2014 " + inj if inj else "")
+        elif inj:
+            detail = ("Limited \u2014 " + inj) if "Limited" in prac else inj
+        else:
+            detail = prac
+        if not detail:
+            continue
+        entry = {"detail": detail}
+        if prac and status:
+            entry["timeline"] = "Practice: " + prac
+        out[_vn(nm)] = entry
+    return out
+
+try:
+    injuries = load_injuries_map()
+except Exception as _e:
+    injuries = {}
+    st.info(f"Injury refresh skipped ({_e}).")
+
 template = pathlib.Path("sultan_template.html").read_text()
 html = (template.replace("__DATA__", json.dumps(records, separators=(",", ":")))
-                .replace("__MARKET__", json.dumps(market, separators=(",", ":"))))
+                .replace("__MARKET__", json.dumps(market, separators=(",", ":")))
+                .replace("__INJURIES__", json.dumps(injuries, separators=(",", ":"))))
 components.html(html, height=940, scrolling=True)
 st.caption("ADP: %s · auto-refreshes weekly (hit ↻ Refresh data to update now)." % adp_src)
