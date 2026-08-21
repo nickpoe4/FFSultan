@@ -71,6 +71,16 @@ tr.rookrow td:first-child{box-shadow:inset 4px 0 0 var(--yellow);}
 .flagname{cursor:pointer;}
 .flagname em.flagmeta{font-style:normal;opacity:.6;font-size:11px;font-weight:400;margin-left:5px;}
 tr.flagcat td{background:var(--purple);color:#fff;font-family:'Lilita One',cursive;letter-spacing:.5px;font-size:12px;padding:4px 10px;border:2px solid var(--ink);}
+.flagwhyin{width:100%;min-width:90px;border:1px solid rgba(0,0,0,.25);border-radius:6px;padding:3px 6px;font-family:'Space Grotesk';font-size:12px;background:#fff;color:var(--ink);box-sizing:border-box;}
+.flagwhyin:focus{outline:none;border-color:var(--purple);}
+tr.flagaddrow td{padding-top:8px;}
+.flagaddname,.flagaddnote,.flagaddcat{border:2px solid var(--ink);border-radius:8px;padding:5px 8px;font-family:'Space Grotesk';font-size:13px;background:#fff;color:var(--ink);margin:0 6px 4px 0;}
+.flagaddname{min-width:170px;}
+.flagaddnote{min-width:150px;}
+.flagaddcat{min-width:130px;}
+.flagaddname:focus,.flagaddnote:focus,.flagaddcat:focus{outline:none;border-color:var(--purple);}
+.flagaddbtn{vertical-align:middle;}
+.flagresetbtn{border:none;background:none;color:var(--pink);cursor:pointer;font-family:'Space Grotesk';font-size:11px;text-decoration:underline;padding:0;}
 .pcblock{margin-bottom:12px;}
 .pcteam{font-family:'Bowlby One SC';font-size:16px;color:var(--purple);}
 .pcchange{font-family:'Space Grotesk';font-size:12px;font-weight:700;opacity:.8;margin:2px 0 7px;}
@@ -558,38 +568,45 @@ function renderProjections(){
     +'<td class="r mas">'+n0(ptsF(r))+'</td></tr>';});
   document.getElementById('proj-list').innerHTML=h+'</tbody></table>';
 }
+function flagKey(){return 'sultan90_flags';}
+function flagsGet(){try{var s=localStorage.getItem(flagKey());if(s)return JSON.parse(s);}catch(e){}return JSON.parse(JSON.stringify(FLAGS));}
+function flagsSave(o){try{localStorage.setItem(flagKey(),JSON.stringify(o));}catch(e){}}
+function flagAdd(g){var ni=document.getElementById('fn_'+g),oi=document.getElementById('fo_'+g),ci=document.getElementById('fc_'+g);
+  var nm=(ni&&ni.value||'').trim();if(!nm)return;var r=findByName(nm);
+  var o=flagsGet();if(!o[g])o[g]=[];
+  var ent={name:r?r.name:nm};var note=(oi&&oi.value||'').trim();if(note)ent.note=note;var cat=(ci&&ci.value||'').trim();if(cat)ent.cat=cat;
+  o[g].push(ent);flagsSave(o);renderFlags();var f=document.getElementById('fn_'+g);if(f)f.focus();}
+function flagDel(g,i){var o=flagsGet();if(o[g]){o[g].splice(i,1);flagsSave(o);renderFlags();}}
+function flagNote(g,i,el){var o=flagsGet();if(o[g]&&o[g][i]){o[g][i].note=el.value;flagsSave(o);}}
+function flagReset(){if(confirm('Reset Flag Plants to the built-in defaults? This clears your own changes.')){try{localStorage.removeItem(flagKey());}catch(e){}renderFlags();}}
 function renderFlags(){
-  function nameCell(it){
-    var r=findByName(it.name);
-    var dk=encodeURIComponent(r?key(r):it.name);
-    var sub=r?(' <em class="flagmeta">'+r.pos+(r.team?(' \u00b7 '+r.team):'')+'</em>'):'';
-    return '<span class="pr flagname" data-k="'+dk+'">'+mktEsc(it.name)+sub+'</span>';
-  }
-  function statCells(it){
-    var r=findByName(it.name);
-    return '<td>'+(r?teamCell(r):'\u2013')+'</td><td class="r">'+(r?ppg(r).toFixed(1):'\u2013')+'</td><td class="r adp">'+(r?adpStr(r):'\u2013')+'</td>';
-  }
-  function rowsFor(list){
-    var h='<table><thead><tr><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th><th>Why</th></tr></thead><tbody>';
+  var F=flagsGet();
+  var dl='<datalist id="flag-players">'+DATA.map(function(r){return '<option value="'+mktEsc(r.name)+'">';}).join('')+'</datalist>';
+  function nameCell(it){var r=findByName(it.name);var dk=encodeURIComponent(r?key(r):it.name);var sub=r?(' <em class="flagmeta">'+r.pos+(r.team?(' \u00b7 '+r.team):'')+'</em>'):'';return '<span class="pr flagname" data-k="'+dk+'">'+mktEsc(it.name)+sub+'</span>';}
+  function statCells(it){var r=findByName(it.name);return '<td>'+(r?teamCell(r):'\u2013')+'</td><td class="r">'+(r?ppg(r).toFixed(1):'\u2013')+'</td><td class="r adp">'+(r?adpStr(r):'\u2013')+'</td>';}
+  function sectionTable(g,list){
+    var h='<table><thead><tr><th>Player</th><th>Tm</th><th class="num">PPG</th><th class="num">ADP</th><th>Why</th><th></th></tr></thead><tbody>';
     var _lc='';
-    list.forEach(function(it){
-      if(it.cat&&it.cat!==_lc){_lc=it.cat;h+='<tr class="flagcat"><td colspan="5">'+it.cat+'</td></tr>';}
-      h+='<tr class="flagrow"><td>'+nameCell(it)+'</td>'+statCells(it)+'<td class="flagwhy">'+(it.note?mktEsc(it.note):'')+'</td></tr>';
+    (list||[]).forEach(function(it,i){
+      if(it.cat&&it.cat!==_lc){_lc=it.cat;h+='<tr class="flagcat"><td colspan="6">'+mktEsc(it.cat)+'</td></tr>';}
+      h+='<tr class="flagrow"><td>'+nameCell(it)+'</td>'+statCells(it)
+        +'<td><input class="flagwhyin" value="'+mktEsc(it.note||'')+'" placeholder="why\u2026" onchange="flagNote(\''+g+'\','+i+',this)"></td>'
+        +'<td><button class="dgx" title="Remove" onclick="flagDel(\''+g+'\','+i+')">\u00d7</button></td></tr>';
     });
+    h+='<tr class="flagaddrow"><td colspan="6">'
+      +'<input list="flag-players" id="fn_'+g+'" class="flagaddname" placeholder="Add player\u2026">'
+      +'<input id="fo_'+g+'" class="flagaddnote" placeholder="why (optional)">'
+      +'<input id="fc_'+g+'" class="flagaddcat" placeholder="tier/label (optional)">'
+      +'<button class="tierctl flagaddbtn" onclick="flagAdd(\''+g+'\')">+ Add</button>'
+      +'</td></tr>';
     return h+'</tbody></table>';
   }
-  var html='<div class="card90" style="margin-bottom:14px"><div class="cbig" style="color:var(--purple)">\uD83D\uDEA9 Flag Plants</div><small>Your priority draft targets for 2026. Click any player name to open their card. Saved on this device.</small></div>';
-  var mg=FLAGS.MYGUYS||[];
-  html+='<div class="flagsec myguys"><div class="tpsec myguystitle">\u2B50 My Guys <span class="flagcount">'+mg.length+'</span></div>';
-  html+='<p class="flagempty" style="margin:2px 0 8px">The players you\'re most bullish on this year \u2014 any position.</p>';
-  html+=mg.length?rowsFor(mg):'';
-  html+='</div>';
-  var order=[['QB','Quarterbacks'],['RB','Running Backs'],['WR','Wide Receivers'],['TE','Tight Ends']];
-  order.forEach(function(pair){
-    var pos=pair[0], label=pair[1], list=(FLAGS[pos]||[]);
-    html+='<div class="flagsec"><div class="tpsec">'+label+' <span class="flagcount">'+list.length+'</span></div>';
-    html+=list.length?rowsFor(list):'<p class="flagempty">No '+pos+' flags planted yet.</p>';
-    html+='</div>';
+  var html=dl+'<div class="card90" style="margin-bottom:14px"><div class="cbig" style="color:var(--purple)">\uD83D\uDEA9 Flag Plants</div><small>Your draft targets \u2014 add players yourself with the box under each group (type to autocomplete), add an optional \u201cwhy\u201d note, and tap \u00d7 to remove. Click a name to open the card. Saved on this device. <button class="flagresetbtn" onclick="flagReset()">reset to defaults</button></small></div>';
+  var mg=F.MYGUYS||[];
+  html+='<div class="flagsec myguys"><div class="tpsec myguystitle">\u2B50 My Guys <span class="flagcount">'+mg.length+'</span></div><p class="flagempty" style="margin:2px 0 8px">Your top players you\'re most bullish on \u2014 any position.</p>'+sectionTable('MYGUYS',mg)+'</div>';
+  [['QB','Quarterbacks'],['RB','Running Backs'],['WR','Wide Receivers'],['TE','Tight Ends']].forEach(function(p){
+    var g=p[0],list=F[g]||[];
+    html+='<div class="flagsec"><div class="tpsec">'+p[1]+' <span class="flagcount">'+list.length+'</span></div>'+sectionTable(g,list)+'</div>';
   });
   document.getElementById('flags-list').innerHTML=html;
 }
